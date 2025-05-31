@@ -6,31 +6,34 @@ This module sets up the SQLAlchemy database connection and session management.
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-import os
+from app.core.config import settings
 
-SQLALCHEMY_DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://postgres:postgres@localhost:5432/itams"
+# Create database engine
+engine = create_engine(
+    settings.DATABASE_URL,
+    pool_pre_ping=True,
+    pool_recycle=300
 )
 
-# Create SQLAlchemy engine
-# The engine is the starting point for any SQLAlchemy application
-engine = create_engine(SQLALCHEMY_DATABASE_URL)
-
-# Create session factory
-# This will be used to create individual database sessions
+# Create sessionmaker
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+# Base class for models
 Base = declarative_base()
 
 def get_db():
     """
-    Dependency function that yields database sessions.
-    This function is used by FastAPI to get a database session for each request.
-    The session is automatically closed after the request is complete.
+    Dependency to get database session
     """
     db = SessionLocal()
     try:
         yield db
     finally:
-        db.close() 
+        db.close()
+
+def create_tables():
+    """
+    Create all tables in the database
+    """
+    from app.models.models import Base
+    Base.metadata.create_all(bind=engine) 

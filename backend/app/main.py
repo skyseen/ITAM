@@ -6,55 +6,55 @@ middleware, and routes.
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from app.core.database import engine
-from app.models import asset
-from app.routers import assets
+from contextlib import asynccontextmanager
 
-# Create database tables
-asset.Base.metadata.create_all(bind=engine)
+from app.core.config import settings
+from app.core.database import create_tables
+from app.routers import assets, users, auth
 
-# Create FastAPI application instance with metadata
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    create_tables()
+    yield
+    # Shutdown
+    pass
+
 app = FastAPI(
-    title="IT Asset Management System",
-    description="API for managing IT assets, their issuance, and tracking",
-    version="1.0.0"
+    title=settings.APP_NAME,
+    version=settings.VERSION,
+    description="A comprehensive IT Asset Management System for tracking and managing IT equipment",
+    lifespan=lifespan
 )
 
-# Configure CORS middleware
-# This allows the frontend to make requests to the backend
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # React frontend URL
-    allow_credentials=True,  # Allow cookies in cross-origin requests
-    allow_methods=["*"],     # Allow all HTTP methods
-    allow_headers=["*"],     # Allow all headers
+    allow_origins=settings.CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Include routers
-app.include_router(assets.router)
+app.include_router(auth.router, prefix="/api/v1")
+app.include_router(assets.router, prefix="/api/v1")
+app.include_router(users.router, prefix="/api/v1")
 
 @app.get("/")
-async def root():
-    """
-    Root endpoint that returns a welcome message.
-    This is the entry point of the API.
-    """
+def read_root():
     return {
-        "message": "Welcome to IT Asset Management System API",
-        "docs_url": "/docs",
-        "redoc_url": "/redoc"
+        "message": f"Welcome to {settings.APP_NAME}",
+        "version": settings.VERSION,
+        "docs": "/docs",
+        "api": "/api/v1"
     }
 
 @app.get("/health")
-async def health_check():
-    """
-    Health check endpoint.
-    Used to verify if the API is running and operational.
-    """
-    return JSONResponse(
-        content={
-            "status": "healthy",
-            "version": "1.0.0"
-        }
-    ) 
+def health_check():
+    return {"status": "healthy"}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000) 
