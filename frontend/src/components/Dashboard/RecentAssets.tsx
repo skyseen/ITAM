@@ -55,9 +55,13 @@ export const RecentAssets: React.FC = () => {
       <DataGrid
         rows={mockAssets}
         columns={columns}
-        pageSize={5}
-        rowsPerPageOptions={[5]}
-        disableSelectionOnClick
+        initialState={{
+          pagination: {
+            paginationModel: { page: 0, pageSize: 5 },
+          },
+        }}
+        pageSizeOptions={[5]}
+        disableRowSelectionOnClick
       />
     </div>
   );

@@ -1,3 +1,39 @@
+"""
+Asset Management Router for IT Asset Management System.
+
+This module provides comprehensive API endpoints for managing IT assets throughout
+their lifecycle. It handles all CRUD operations, asset tracking, issuance management,
+reporting, and analytics related to IT assets.
+
+Key Features:
+- Complete asset lifecycle management (create, read, update, delete)
+- Asset issuance and return tracking with user assignments
+- Advanced filtering and search capabilities across multiple fields
+- Dashboard data aggregation with real-time statistics
+- CSV export functionality for reporting and compliance
+- Asset history tracking and audit trail
+- Warranty monitoring and expiration alerts
+- Idle asset detection and notifications
+
+Security Features:
+- JWT-based authentication required for all endpoints
+- Role-based access control (RBAC) for different user levels
+- Department-based asset visibility restrictions
+- Input validation and sanitization
+- SQL injection prevention through ORM usage
+
+Business Logic:
+- Asset status management (available, in_use, maintenance, retired)
+- Automatic asset ID generation following organizational standards
+- Warranty expiration monitoring with configurable alert thresholds
+- Asset utilization tracking and idle detection
+- Department-based asset allocation and reporting
+
+Author: IT Asset Management System
+Version: 1.0.0
+Created: 2024
+"""
+
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
 from sqlalchemy.orm import Session
 from sqlalchemy import func, extract, and_, or_

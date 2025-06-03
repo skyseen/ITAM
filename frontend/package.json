@@ -4,6 +4,7 @@
   "private": true,
   "dependencies": {
     "@chakra-ui/react": "^2.8.2",
+    "@chakra-ui/icons": "^2.1.1",
     "@emotion/react": "^11.11.3",
     "@emotion/styled": "^11.11.0",
     "@mui/icons-material": "^5.14.19",
@@ -54,6 +55,5 @@
   },
   "devDependencies": {
     "@types/recharts": "^1.8.29"
-  },
-  "proxy": "http://localhost:8000"
+  }
 } 
