@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import { api } from './AuthContext';
 
 // Types
@@ -73,7 +73,7 @@ export const AssetProvider: React.FC<AssetProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState(false);
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
 
-  const fetchAssets = async (params: any = {}) => {
+  const fetchAssets = useCallback(async (params: any = {}) => {
     setLoading(true);
     try {
       const response = await api.get('/assets', { params });
@@ -83,16 +83,16 @@ export const AssetProvider: React.FC<AssetProviderProps> = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     try {
       const response = await api.get('/assets/dashboard');
       setDashboardData(response.data);
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error);
     }
-  };
+  }, []);
 
   const createAsset = async (asset: AssetCreate) => {
     try {

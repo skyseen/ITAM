@@ -237,27 +237,33 @@ def create_asset(asset: AssetCreate, db: Session = Depends(get_db)):
     return asset_response
 
 @router.get("/", response_model=List[AssetResponse])
+@router.get("", response_model=List[AssetResponse])
 def get_assets(
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
-    status: Optional[AssetStatus] = None,
-    department: Optional[str] = None,
-    asset_type: Optional[str] = None,
-    search: Optional[str] = None,
+    status: Optional[str] = Query(None),
+    department: Optional[str] = Query(None),
+    asset_type: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
     db: Session = Depends(get_db)
 ):
     """Get assets with filtering and pagination"""
     query = db.query(Asset)
     
-    # Apply filters
-    if status:
-        query = query.filter(Asset.status == status)
-    if department:
-        query = query.filter(Asset.department == department)
-    if asset_type:
-        query = query.filter(Asset.type == asset_type)
-    if search:
-        search_term = f"%{search}%"
+    # Apply filters (handle empty strings properly)
+    if status and status.strip():
+        try:
+            status_enum = AssetStatus(status.strip())
+            query = query.filter(Asset.status == status_enum)
+        except ValueError:
+            # Invalid status value, ignore the filter
+            pass
+    if department and department.strip():
+        query = query.filter(Asset.department == department.strip())
+    if asset_type and asset_type.strip():
+        query = query.filter(Asset.type == asset_type.strip())
+    if search and search.strip():
+        search_term = f"%{search.strip()}%"
         query = query.filter(
             or_(
                 Asset.asset_id.ilike(search_term),
@@ -450,17 +456,22 @@ def return_asset(asset_id: int, db: Session = Depends(get_db)):
 # Export functionality
 @router.get("/export/csv")
 def export_assets_csv(
-    status: Optional[AssetStatus] = None,
-    department: Optional[str] = None,
+    status: Optional[str] = Query(None),
+    department: Optional[str] = Query(None),
     db: Session = Depends(get_db)
 ):
     """Export assets to CSV"""
     query = db.query(Asset)
     
-    if status:
-        query = query.filter(Asset.status == status)
-    if department:
-        query = query.filter(Asset.department == department)
+    if status and status.strip():
+        try:
+            status_enum = AssetStatus(status.strip())
+            query = query.filter(Asset.status == status_enum)
+        except ValueError:
+            # Invalid status value, ignore the filter
+            pass
+    if department and department.strip():
+        query = query.filter(Asset.department == department.strip())
     
     assets = query.all()
     
