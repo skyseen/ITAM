@@ -3,11 +3,13 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { ChakraProvider, Box } from '@chakra-ui/react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { AssetProvider } from './contexts/AssetContext';
-import Navbar from './components/Navbar';
+import { gradientBackgrounds } from './theme/futuristicTheme';
+import Navigation from './components/Navigation';
 import Login from './components/Login';
-import Dashboard from './components/Dashboard/Dashboard';
+import FuturisticDashboard from './components/Dashboard/FuturisticDashboard';
 import AssetList from './components/AssetList';
 import AssetForm from './components/AssetForm';
+import AssetDetail from './components/AssetDetail';
 import UserManagement from './components/UserManagement';
 import Profile from './components/Profile';
 
@@ -45,16 +47,19 @@ const AppContent: React.FC = () => {
   const { user } = useAuth();
 
   return (
-    <Box minH="100vh" bg="gray.50">
-      {user && <Navbar />}
-      <Box p={user ? 4 : 0}>
+    <Box 
+      minH="100vh" 
+      bgGradient={user ? gradientBackgrounds.primary : 'gray.50'}
+    >
+      {user && <Navigation />}
+      <Box p={user ? 0 : 0}>
         <Routes>
           <Route path="/login" element={user ? <Navigate to="/dashboard" /> : <Login />} />
           <Route
             path="/dashboard"
             element={
               <ProtectedRoute>
-                <Dashboard />
+                <FuturisticDashboard />
               </ProtectedRoute>
             }
           />
@@ -67,6 +72,14 @@ const AppContent: React.FC = () => {
             }
           />
           <Route
+            path="/assets/:id"
+            element={
+              <ProtectedRoute>
+                <AssetDetail />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/assets/new"
             element={
               <AdminRoute>
@@ -75,7 +88,7 @@ const AppContent: React.FC = () => {
             }
           />
           <Route
-            path="/assets/edit/:id"
+            path="/assets/:id/edit"
             element={
               <AdminRoute>
                 <AssetForm />

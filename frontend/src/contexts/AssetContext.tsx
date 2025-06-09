@@ -1,7 +1,29 @@
+/**
+ * Asset Context - Centralized Asset Management State
+ * 
+ * This context provides comprehensive asset management functionality including:
+ * - Asset CRUD operations with optimistic updates
+ * - Dashboard data aggregation and caching
+ * - Real-time asset status tracking
+ * - Export functionality with proper file handling
+ * - Error handling and loading states
+ * 
+ * Performance Optimizations:
+ * - useCallback for memoized functions
+ * - Selective re-renders with proper dependency arrays
+ * - Efficient API calls with proper error boundaries
+ * 
+ * @author IT Asset Management System
+ * @version 2.0.0
+ */
+
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import { api } from './AuthContext';
 
-// Types
+/**
+ * Core Asset Interface
+ * Represents a complete asset record with all metadata
+ */
 export interface Asset {
   id: number;
   asset_id: string;

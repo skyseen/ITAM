@@ -1,0 +1,311 @@
+/**
+ * IssueAssetModal Component - Futuristic Asset Issuance Interface
+ * 
+ * Modal component for issuing assets to users with a modern, glass-morphism design
+ */
+
+import React, { useState, useEffect } from 'react';
+import {
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  ModalCloseButton,
+  Button,
+  FormControl,
+  FormLabel,
+  Select,
+  Textarea,
+  VStack,
+  HStack,
+  Text,
+  Badge,
+  useToast,
+  Box,
+  Avatar,
+  Icon,
+  useColorModeValue,
+} from '@chakra-ui/react';
+import { CalendarIcon, EditIcon } from '@chakra-ui/icons';
+import { useAssets, Asset } from '../contexts/AssetContext';
+
+interface User {
+  id: number;
+  full_name: string;
+  department: string;
+  email: string;
+}
+
+interface IssueAssetModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  asset: Asset;
+}
+
+const IssueAssetModal: React.FC<IssueAssetModalProps> = ({ isOpen, onClose, asset }) => {
+  const [selectedUserId, setSelectedUserId] = useState<string>('');
+  const [expectedReturnDate, setExpectedReturnDate] = useState<string>('');
+  const [notes, setNotes] = useState<string>('');
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  
+  const { issueAsset, fetchAssets } = useAssets();
+  const toast = useToast();
+
+  // Theme for futuristic design
+  const overlayBg = useColorModeValue(
+    'rgba(0, 0, 0, 0.4)',
+    'rgba(0, 0, 0, 0.6)'
+  );
+  const modalBg = useColorModeValue(
+    'linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%)',
+    'linear-gradient(135deg, rgba(45, 55, 72, 0.9) 0%, rgba(26, 32, 44, 0.9) 100%)'
+  );
+
+  // Mock users data - replace with actual API call
+  useEffect(() => {
+    if (isOpen) {
+      setLoadingUsers(true);
+      // Simulate API call for users
+      setTimeout(() => {
+        setUsers([
+          { id: 1, full_name: 'John Doe', department: 'Engineering', email: 'john@company.com' },
+          { id: 2, full_name: 'Jane Smith', department: 'Marketing', email: 'jane@company.com' },
+          { id: 3, full_name: 'Mike Johnson', department: 'Finance', email: 'mike@company.com' },
+          { id: 4, full_name: 'Alice Johnson', department: 'Engineering', email: 'alice@company.com' },
+          { id: 5, full_name: 'Bob Smith', department: 'Marketing', email: 'bob@company.com' },
+        ]);
+        setLoadingUsers(false);
+      }, 1000);
+    }
+  }, [isOpen]);
+
+  const handleSubmit = async () => {
+    if (!selectedUserId) {
+      toast({
+        title: 'Validation Error',
+        description: 'Please select a user',
+        status: 'error',
+        duration: 3000,
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const issueData = {
+        user_id: parseInt(selectedUserId),
+        expected_return_date: expectedReturnDate || null,
+        notes: notes || null,
+        issued_by: 'Current User', // Replace with actual user
+      };
+
+      await issueAsset(asset.id, issueData);
+      
+      toast({
+        title: 'Asset Issued Successfully',
+        description: `${asset.asset_id} has been issued to the selected user`,
+        status: 'success',
+        duration: 3000,
+      });
+
+      // Reset form
+      setSelectedUserId('');
+      setExpectedReturnDate('');
+      setNotes('');
+      
+      // Refresh assets and close modal
+      await fetchAssets();
+      onClose();
+    } catch (error: any) {
+      toast({
+        title: 'Issue Failed',
+        description: error.response?.data?.detail || 'Failed to issue asset',
+        status: 'error',
+        duration: 5000,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleClose = () => {
+    setSelectedUserId('');
+    setExpectedReturnDate('');
+    setNotes('');
+    onClose();
+  };
+
+  const selectedUser = users.find(u => u.id === parseInt(selectedUserId));
+
+  return (
+    <Modal isOpen={isOpen} onClose={handleClose} size="xl">
+      <ModalOverlay bg={overlayBg} backdropFilter="blur(10px)" />
+      <ModalContent
+        bg={modalBg}
+        backdropFilter="blur(20px)"
+        border="1px solid"
+        borderColor="rgba(255, 255, 255, 0.1)"
+        borderRadius="20px"
+        boxShadow="0 8px 32px 0 rgba(31, 38, 135, 0.37)"
+      >
+        <ModalHeader color="white">
+          <HStack>
+                              <EditIcon color="blue.300" />
+            <Text>Issue Asset: {asset.asset_id}</Text>
+          </HStack>
+        </ModalHeader>
+        <ModalCloseButton color="white" />
+        
+        <ModalBody pb={6}>
+          <VStack spacing={6} align="stretch">
+            {/* Asset Information */}
+            <Box 
+              p={4} 
+              bg="rgba(255, 255, 255, 0.05)" 
+              borderRadius="12px"
+              border="1px solid rgba(255, 255, 255, 0.1)"
+            >
+              <Text fontSize="sm" color="gray.300" mb={2}>Asset Details</Text>
+              <HStack justify="space-between">
+                <VStack align="start" spacing={1}>
+                  <Text color="white" fontWeight="bold">{asset.brand} {asset.model}</Text>
+                  <Text color="gray.300" fontSize="sm">{asset.type}</Text>
+                </VStack>
+                <Badge colorScheme="green" size="lg">
+                  Available
+                </Badge>
+              </HStack>
+            </Box>
+
+            {/* User Selection */}
+            <FormControl>
+              <FormLabel color="white">
+                <HStack>
+                  <Icon as={FiUser} color="purple.300" />
+                  <Text>Select User</Text>
+                </HStack>
+              </FormLabel>
+              <Select
+                placeholder={loadingUsers ? "Loading users..." : "Choose a user..."}
+                value={selectedUserId}
+                onChange={(e) => setSelectedUserId(e.target.value)}
+                bg="rgba(255, 255, 255, 0.1)"
+                border="1px solid rgba(255, 255, 255, 0.2)"
+                color="white"
+                _placeholder={{ color: 'gray.400' }}
+                _hover={{ borderColor: 'rgba(255, 255, 255, 0.3)' }}
+                _focus={{ borderColor: 'blue.300', boxShadow: '0 0 0 1px #63b3ed' }}
+                disabled={loadingUsers}
+              >
+                {users.map(user => (
+                  <option key={user.id} value={user.id} style={{ background: '#2D3748', color: 'white' }}>
+                    {user.full_name} - {user.department}
+                  </option>
+                ))}
+              </Select>
+            </FormControl>
+
+            {/* Selected User Preview */}
+            {selectedUser && (
+              <Box 
+                p={4} 
+                bg="rgba(147, 51, 234, 0.1)" 
+                borderRadius="12px"
+                border="1px solid rgba(147, 51, 234, 0.3)"
+              >
+                <HStack spacing={4}>
+                  <Avatar name={selectedUser.full_name} size="sm" />
+                  <VStack align="start" spacing={0}>
+                    <Text color="white" fontWeight="medium">{selectedUser.full_name}</Text>
+                    <Text color="gray.300" fontSize="sm">{selectedUser.department}</Text>
+                    <Text color="gray.400" fontSize="xs">{selectedUser.email}</Text>
+                  </VStack>
+                </HStack>
+              </Box>
+            )}
+
+            {/* Expected Return Date */}
+            <FormControl>
+              <FormLabel color="white">
+                <HStack>
+                  <Icon as={FiCalendar} color="orange.300" />
+                  <Text>Expected Return Date (Optional)</Text>
+                </HStack>
+              </FormLabel>
+              <input
+                type="date"
+                value={expectedReturnDate}
+                onChange={(e) => setExpectedReturnDate(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  borderRadius: '6px',
+                  color: 'white',
+                  fontSize: '16px',
+                }}
+              />
+            </FormControl>
+
+            {/* Notes */}
+            <FormControl>
+              <FormLabel color="white">
+                <HStack>
+                  <Icon as={FiFileText} color="green.300" />
+                  <Text>Notes (Optional)</Text>
+                </HStack>
+              </FormLabel>
+              <Textarea
+                placeholder="Any additional notes about this issuance..."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                bg="rgba(255, 255, 255, 0.1)"
+                border="1px solid rgba(255, 255, 255, 0.2)"
+                color="white"
+                _placeholder={{ color: 'gray.400' }}
+                _hover={{ borderColor: 'rgba(255, 255, 255, 0.3)' }}
+                _focus={{ borderColor: 'green.300', boxShadow: '0 0 0 1px #68d391' }}
+                rows={3}
+              />
+            </FormControl>
+          </VStack>
+        </ModalBody>
+
+        <ModalFooter>
+          <HStack spacing={4}>
+            <Button
+              variant="ghost"
+              onClick={handleClose}
+              color="gray.300"
+              _hover={{ bg: 'rgba(255, 255, 255, 0.1)' }}
+            >
+              Cancel
+            </Button>
+            <Button
+              colorScheme="blue"
+              onClick={handleSubmit}
+              isLoading={loading}
+              loadingText="Issuing..."
+              bg="linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
+              _hover={{ 
+                bg: "linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%)",
+                transform: 'translateY(-2px)',
+                boxShadow: '0 4px 20px rgba(102, 126, 234, 0.4)'
+              }}
+              transition="all 0.2s"
+            >
+              Issue Asset
+            </Button>
+          </HStack>
+        </ModalFooter>
+      </ModalContent>
+    </Modal>
+  );
+};
+
+export default IssueAssetModal; 

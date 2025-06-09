@@ -80,6 +80,18 @@ import {
 import { useAssets, Asset } from '../contexts/AssetContext';
 import { useAuth } from '../contexts/AuthContext';
 
+// Import navigation hook
+import { useNavigate } from 'react-router-dom';
+
+// Import futuristic theme system for consistent glass-morphism design
+import { 
+  glassEffects, 
+  gradientBackgrounds, 
+  futuristicColors, 
+  getStatusColor,
+  componentPresets 
+} from '../theme/futuristicTheme';
+
 /**
  * Asset status color mapping for consistent visual indicators
  * Each status has a corresponding Chakra UI color scheme
@@ -130,6 +142,7 @@ interface AssetRowProps {
   onIssue: (asset: Asset) => void;
   onReturn: (asset: Asset) => void;
   userRole: string;
+  navigate: (path: string) => void;
 }
 
 const AssetRow: React.FC<AssetRowProps> = ({
@@ -139,6 +152,7 @@ const AssetRow: React.FC<AssetRowProps> = ({
   onIssue,
   onReturn,
   userRole,
+  navigate,
 }) => {
   // Determine if user can perform actions based on role and asset status
   const canEdit = userRole === 'admin' || userRole === 'manager';
@@ -147,23 +161,43 @@ const AssetRow: React.FC<AssetRowProps> = ({
   const canReturn = asset.status === 'in_use' && canEdit;
 
   return (
-    <Tr>
+    <Tr 
+      _hover={{ 
+        bg: 'rgba(255, 255, 255, 0.05)',
+        transform: 'translateY(-1px)',
+        transition: 'all 0.2s',
+      }}
+    >
       {/* Asset ID - Primary identifier */}
-      <Td fontWeight="semibold">{asset.asset_id}</Td>
+      <Td 
+        fontWeight="semibold" 
+        color="white"
+        borderColor="rgba(255, 255, 255, 0.1)"
+      >
+        {asset.asset_id}
+      </Td>
       
       {/* Asset Type - Category classification */}
-      <Td textTransform="capitalize">{asset.type}</Td>
+      <Td 
+        textTransform="capitalize" 
+        color="gray.200"
+        borderColor="rgba(255, 255, 255, 0.1)"
+      >
+        {asset.type}
+      </Td>
       
       {/* Brand and Model - Equipment details */}
-      <Td>
+      <Td borderColor="rgba(255, 255, 255, 0.1)">
         <VStack spacing={0} align="start">
-          <Text fontWeight="medium">{asset.brand}</Text>
-          <Text fontSize="sm" color="gray.500">{asset.model}</Text>
+          <Text fontWeight="medium" color="white">{asset.brand}</Text>
+          <Text fontSize="sm" color="gray.300">{asset.model}</Text>
         </VStack>
       </Td>
       
       {/* Department - Organizational assignment */}
-      <Td>{asset.department}</Td>
+      <Td color="gray.200" borderColor="rgba(255, 255, 255, 0.1)">
+        {asset.department}
+      </Td>
       
       {/* Status - Current lifecycle state with visual indicator */}
       <Td>
@@ -228,7 +262,10 @@ const AssetRow: React.FC<AssetRowProps> = ({
           />
           <MenuList>
             {/* View Details - Available to all users */}
-            <MenuItem icon={<SearchIcon />}>
+            <MenuItem 
+              icon={<SearchIcon />} 
+              onClick={() => navigate(`/assets/${asset.id}`)}
+            >
               View Details
             </MenuItem>
             
@@ -279,6 +316,7 @@ const AssetRow: React.FC<AssetRowProps> = ({
 const AssetList: React.FC = () => {
   // Get authentication context for user role and permissions
   const { user } = useAuth();
+  const navigate = useNavigate();
   
   // Get asset management functions from context
   const { 
@@ -441,19 +479,25 @@ const AssetList: React.FC = () => {
 
   /**
    * Handle asset edit navigation
-   * Navigates to the asset edit form (placeholder for now)
+   * Navigates to the asset edit form
    */
   const handleEdit = (asset: Asset) => {
-    // TODO: Navigate to edit form
-    console.log('Edit asset:', asset);
+    navigate(`/assets/${asset.id}/edit`);
   };
 
   return (
-    <Container maxW="8xl" py={8}>
-      {/* Page Header */}
-      <VStack spacing={6} align="stretch" mb={8}>
+    <Box
+      minH="100vh"
+      bgGradient={gradientBackgrounds.primary}
+      position="relative"
+    >
+      <Container maxW="8xl" py={8}>
+        {/* Page Header */}
+        <VStack spacing={6} align="stretch" mb={8}>
         <HStack justify="space-between" align="center">
-          <Heading size="lg">Asset Inventory</Heading>
+          <Heading size="lg" color="white" textShadow="0 2px 4px rgba(0, 0, 0, 0.3)">
+            Asset Inventory
+          </Heading>
           <HStack spacing={4}>
             {/* Export Button */}
             <Button
@@ -480,10 +524,16 @@ const AssetList: React.FC = () => {
         </HStack>
 
         {/* Filters and Search Section */}
-        <Card>
+        <Card sx={{ ...glassEffects.primary }}>
           <CardBody>
             <VStack spacing={4}>
-              <Text fontWeight="semibold" alignSelf="start">
+              <Text 
+                fontWeight="semibold" 
+                alignSelf="start"
+                color="white"
+                fontSize="lg"
+                textShadow="0 1px 2px rgba(0, 0, 0, 0.3)"
+              >
                 Search and Filter Assets
               </Text>
               
@@ -550,7 +600,7 @@ const AssetList: React.FC = () => {
       </VStack>
 
       {/* Assets Table */}
-      <Card>
+      <Card sx={{ ...glassEffects.primary }}>
         <CardBody p={0}>
           {loading ? (
             // Loading State
@@ -575,16 +625,21 @@ const AssetList: React.FC = () => {
           ) : (
             // Assets Table
             <Table variant="simple">
-              <Thead bg="gray.50">
+              <Thead 
+                sx={{
+                  ...componentPresets.tableHeader,
+                  bg: 'rgba(255, 255, 255, 0.15)',
+                }}
+              >
                 <Tr>
-                  <Th>Asset ID</Th>
-                  <Th>Type</Th>
-                  <Th>Brand/Model</Th>
-                  <Th>Department</Th>
-                  <Th>Status</Th>
-                  <Th>Assigned To</Th>
-                  <Th>Warranty</Th>
-                  <Th>Actions</Th>
+                  <Th color="white" fontWeight="bold" borderColor="rgba(255, 255, 255, 0.1)">Asset ID</Th>
+                  <Th color="white" fontWeight="bold" borderColor="rgba(255, 255, 255, 0.1)">Type</Th>
+                  <Th color="white" fontWeight="bold" borderColor="rgba(255, 255, 255, 0.1)">Brand/Model</Th>
+                  <Th color="white" fontWeight="bold" borderColor="rgba(255, 255, 255, 0.1)">Department</Th>
+                  <Th color="white" fontWeight="bold" borderColor="rgba(255, 255, 255, 0.1)">Status</Th>
+                  <Th color="white" fontWeight="bold" borderColor="rgba(255, 255, 255, 0.1)">Assigned To</Th>
+                  <Th color="white" fontWeight="bold" borderColor="rgba(255, 255, 255, 0.1)">Warranty</Th>
+                  <Th color="white" fontWeight="bold" borderColor="rgba(255, 255, 255, 0.1)">Actions</Th>
                 </Tr>
               </Thead>
               <Tbody>
@@ -597,6 +652,7 @@ const AssetList: React.FC = () => {
                     onIssue={prepareIssue}
                     onReturn={handleReturn}
                     userRole={user?.role || 'viewer'}
+                    navigate={navigate}
                   />
                 ))}
               </Tbody>
@@ -664,7 +720,8 @@ const AssetList: React.FC = () => {
 
       {/* TODO: Add Issue Asset Modal */}
       {/* TODO: Add Asset Details Modal */}
-    </Container>
+      </Container>
+    </Box>
   );
 };
 
