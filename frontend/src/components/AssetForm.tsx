@@ -33,38 +33,40 @@ import React, { useState, useEffect } from 'react';
 import {
   Box,
   Container,
-  Heading,
   VStack,
-  HStack,
+  Heading,
   FormControl,
   FormLabel,
-  FormErrorMessage,
-  FormHelperText,
   Input,
   Select,
-  Textarea,
   Button,
-  Card,
-  CardBody,
-  CardHeader,
-  Grid,
-  GridItem,
-  useToast,
-  Spinner,
+  HStack,
   Text,
-  Divider,
-  Badge,
+  useToast,
   Alert,
   AlertIcon,
   AlertTitle,
   AlertDescription,
-  InputGroup,
-  InputLeftAddon,
+  Card,
+  CardHeader,
+  CardBody,
+  Grid,
+  GridItem,
+  FormErrorMessage,
+  FormHelperText,
+  Badge,
+  Textarea,
+  Flex,
+  Spinner,
+  Divider,
   NumberInput,
   NumberInputField,
   NumberInputStepper,
   NumberIncrementStepper,
   NumberDecrementStepper,
+  useColorModeValue,
+  InputGroup,
+  InputLeftAddon,
 } from '@chakra-ui/react';
 import { useNavigate, useParams } from 'react-router-dom';
 
@@ -408,244 +410,434 @@ const AssetForm: React.FC = () => {
   };
 
   return (
-    <Container maxW="4xl" py={8}>
-      {/* Page Header */}
-      <VStack spacing={6} align="stretch" mb={8}>
-        <HStack justify="space-between" align="center">
-          <VStack align="start" spacing={2}>
-            <Heading size="lg">
-              {isEditing ? 'Edit Asset' : 'Add New Asset'}
-            </Heading>
-            <Text color="gray.600">
-              {isEditing 
-                ? 'Update asset information and tracking details'
-                : 'Enter details for the new IT asset to add to inventory'
-              }
-            </Text>
-          </VStack>
-          
-          {/* Status indicator for editing */}
-          {isEditing && (
-            <Badge colorScheme="blue" variant="subtle" px={3} py={1}>
-              Editing Mode
-            </Badge>
-          )}
-        </HStack>
+    <Box
+      minH="100vh"
+      bgGradient={useColorModeValue(
+        'linear(to-br, purple.900, blue.800, teal.700)',
+        'linear(to-br, gray.900, purple.900, blue.900)'
+      )}
+      py={8}
+    >
+      <Container maxW="4xl">
+        {/* Page Header */}
+        <VStack spacing={6} align="stretch" mb={8}>
+          <HStack justify="space-between" align="center">
+            <VStack align="start" spacing={2}>
+              <Heading size="lg" color="white" textShadow="0 2px 4px rgba(0, 0, 0, 0.3)">
+                {isEditing ? 'Edit Asset' : 'Add New Asset'}
+              </Heading>
+              <Text color="gray.200">
+                {isEditing 
+                  ? 'Update asset information and tracking details'
+                  : 'Enter details for the new IT asset to add to inventory'
+                }
+              </Text>
+            </VStack>
+            
+            {/* Status indicator for editing */}
+            {isEditing && (
+              <Badge colorScheme="blue" variant="subtle" px={3} py={1}>
+                Editing Mode
+              </Badge>
+            )}
+          </HStack>
 
-        {/* Form guidance alert */}
-        <Alert status="info" borderRadius="md">
-          <AlertIcon />
-          <Box>
-            <AlertTitle>Form Guidelines</AlertTitle>
-            <AlertDescription>
-              Fields marked with * are required. Asset ID will be auto-generated based on type.
-              Ensure all information is accurate as it will be used for tracking and reporting.
-            </AlertDescription>
-          </Box>
-        </Alert>
-      </VStack>
+          {/* Form guidance alert */}
+          <Alert 
+            status="info" 
+            borderRadius="20px"
+            bg="rgba(6, 182, 212, 0.15)"
+            border="1px solid rgba(6, 182, 212, 0.3)"
+            backdropFilter="blur(10px)"
+            py={4}
+          >
+            <AlertIcon color="cyan.300" />
+            <Box>
+              <AlertTitle color="white" fontSize="lg" fontWeight="bold">📝 Form Guidelines</AlertTitle>
+              <AlertDescription color="gray.100" fontSize="md" lineHeight="1.6">
+                <Text mb={2}>
+                  • Fields marked with <Text as="span" color="red.300" fontWeight="bold">*</Text> are required
+                </Text>
+                <Text mb={2}>
+                  • Asset ID will be auto-generated when you select the asset type
+                </Text>
+                <Text>
+                  • Please ensure all information is accurate for proper tracking and reporting
+                </Text>
+              </AlertDescription>
+            </Box>
+          </Alert>
+        </VStack>
 
-      {/* Main Form */}
-      <form onSubmit={handleSubmit}>
-        <VStack spacing={8} align="stretch">
-          
-          {/* Basic Information Section */}
-          <Card>
-            <CardHeader>
-              <Heading size="md">Basic Information</Heading>
-            </CardHeader>
-            <CardBody>
-              <Grid templateColumns={{ base: '1fr', md: 'repeat(2, 1fr)' }} gap={6}>
-                
-                {/* Asset ID */}
-                <GridItem>
-                  <FormControl isInvalid={Boolean(errors.asset_id)} isRequired>
-                    <FormLabel>Asset ID</FormLabel>
-                    <Input
+        {/* Main Form */}
+        <form onSubmit={handleSubmit}>
+          <VStack spacing={8} align="stretch">
+            
+            {/* Basic Information Section */}
+            <Card
+              bg="rgba(255, 255, 255, 0.1)"
+              backdropFilter="blur(10px)"
+              borderRadius="20px"
+              border="1px solid rgba(255, 255, 255, 0.1)"
+              boxShadow="0 8px 32px 0 rgba(31, 38, 135, 0.37)"
+            >
+              <CardHeader pb={2}>
+                <VStack align="start" spacing={1}>
+                  <Heading size="md" color="white" display="flex" alignItems="center" gap={3}>
+                    💻 Basic Information
+                  </Heading>
+                  <Text color="gray.300" fontSize="sm">
+                    Essential details about the asset
+                  </Text>
+                </VStack>
+              </CardHeader>
+              <CardBody>
+                <Grid templateColumns={{ base: '1fr', md: 'repeat(2, 1fr)' }} gap={6}>
+                  
+                  {/* Asset ID */}
+                  <GridItem>
+                    <FormControl isInvalid={Boolean(errors.asset_id)} isRequired>
+                      <FormLabel color="white" fontWeight="medium">Asset ID</FormLabel>
+                                          <Input
                       value={formData.asset_id}
                       onChange={(e) => handleFieldChange('asset_id', e.target.value)}
                       placeholder="e.g., LAP-001"
                       isDisabled={isEditing} // Don't allow changing asset ID when editing
+                      bg="rgba(255, 255, 255, 0.1)"
+                      border="1px solid rgba(255, 255, 255, 0.2)"
+                      color="white"
+                      _placeholder={{ color: 'gray.400' }}
+                      _hover={{ borderColor: 'rgba(255, 255, 255, 0.3)' }}
+                      _focus={{ 
+                        borderColor: 'blue.300',
+                        boxShadow: '0 0 0 1px rgba(59, 130, 246, 0.5)',
+                      }}
                     />
-                    <FormErrorMessage>{errors.asset_id}</FormErrorMessage>
-                    <FormHelperText>
-                      Unique identifier for this asset. Auto-generated when type is selected.
-                    </FormHelperText>
-                  </FormControl>
-                </GridItem>
+                      <FormErrorMessage>{errors.asset_id}</FormErrorMessage>
+                      <FormHelperText color="gray.300">
+                        Unique identifier for this asset. Auto-generated when type is selected.
+                      </FormHelperText>
+                    </FormControl>
+                  </GridItem>
 
-                {/* Asset Type */}
-                <GridItem>
-                  <FormControl isInvalid={Boolean(errors.type)} isRequired>
-                    <FormLabel>Asset Type</FormLabel>
-                    <Select
-                      value={formData.type}
-                      onChange={(e) => handleFieldChange('type', e.target.value)}
-                      placeholder="Select asset type"
-                    >
-                      {ASSET_TYPES.map(type => (
-                        <option key={type.value} value={type.value}>
-                          {type.label}
-                        </option>
-                      ))}
-                    </Select>
-                    <FormErrorMessage>{errors.type}</FormErrorMessage>
-                    <FormHelperText>
-                      Category that best describes this asset
-                    </FormHelperText>
-                  </FormControl>
-                </GridItem>
+                  {/* Asset Type */}
+                  <GridItem>
+                    <FormControl isInvalid={Boolean(errors.type)} isRequired>
+                      <FormLabel color="white" fontWeight="semibold" fontSize="md">
+                        🖥️ Asset Type <Text as="span" color="red.300">*</Text>
+                      </FormLabel>
+                      <Select
+                        value={formData.type}
+                        onChange={(e) => handleFieldChange('type', e.target.value)}
+                        placeholder="Select asset type"
+                        bg="rgba(255, 255, 255, 0.1)"
+                        border="1px solid rgba(255, 255, 255, 0.2)"
+                        color="white"
+                        _hover={{ borderColor: 'rgba(255, 255, 255, 0.3)' }}
+                        _focus={{ 
+                          borderColor: 'blue.300',
+                          boxShadow: '0 0 0 1px rgba(59, 130, 246, 0.5)',
+                        }}
+                      >
+                        {ASSET_TYPES.map(type => (
+                          <option key={type.value} value={type.value} style={{ background: '#2D3748', color: 'white' }}>
+                            {type.label}
+                          </option>
+                        ))}
+                      </Select>
+                      <FormErrorMessage>{errors.type}</FormErrorMessage>
+                      <FormHelperText color="gray.300">
+                        Category that best describes this asset
+                      </FormHelperText>
+                    </FormControl>
+                  </GridItem>
 
-                {/* Brand */}
-                <GridItem>
-                  <FormControl isInvalid={Boolean(errors.brand)} isRequired>
-                    <FormLabel>Brand</FormLabel>
-                    <Input
-                      value={formData.brand}
-                      onChange={(e) => handleFieldChange('brand', e.target.value)}
-                      placeholder="e.g., Dell, Apple, HP"
-                    />
-                    <FormErrorMessage>{errors.brand}</FormErrorMessage>
-                  </FormControl>
-                </GridItem>
-
-                {/* Model */}
-                <GridItem>
-                  <FormControl isInvalid={Boolean(errors.model)} isRequired>
-                    <FormLabel>Model</FormLabel>
-                    <Input
-                      value={formData.model}
-                      onChange={(e) => handleFieldChange('model', e.target.value)}
-                      placeholder="e.g., XPS 13, MacBook Pro"
-                    />
-                    <FormErrorMessage>{errors.model}</FormErrorMessage>
-                  </FormControl>
-                </GridItem>
-              </Grid>
-            </CardBody>
-          </Card>
-
-          {/* Physical Details Section */}
-          <Card>
-            <CardHeader>
-              <Heading size="md">Physical Details</Heading>
-            </CardHeader>
-            <CardBody>
-              <Grid templateColumns={{ base: '1fr', md: 'repeat(2, 1fr)' }} gap={6}>
-                
-                {/* Serial Number */}
-                <GridItem>
-                  <FormControl>
-                    <FormLabel>Serial Number</FormLabel>
-                    <Input
-                      value={formData.serial_number}
-                      onChange={(e) => handleFieldChange('serial_number', e.target.value)}
-                      placeholder="Manufacturer serial number"
-                    />
-                    <FormHelperText>
-                      Unique serial number from manufacturer (if available)
-                    </FormHelperText>
-                  </FormControl>
-                </GridItem>
-
-                {/* Condition */}
-                <GridItem>
-                  <FormControl>
-                    <FormLabel>Condition</FormLabel>
-                    <Select
-                      value={formData.condition}
-                      onChange={(e) => handleFieldChange('condition', e.target.value)}
-                    >
-                      {CONDITIONS.map(condition => (
-                        <option key={condition.value} value={condition.value}>
-                          {condition.value}
-                        </option>
-                      ))}
-                    </Select>
-                    <FormHelperText>
-                      Current physical condition of the asset
-                    </FormHelperText>
-                  </FormControl>
-                </GridItem>
-
-                {/* Location */}
-                <GridItem colSpan={{ base: 1, md: 2 }}>
-                  <FormControl>
-                    <FormLabel>Location</FormLabel>
-                    <Input
-                      value={formData.location}
-                      onChange={(e) => handleFieldChange('location', e.target.value)}
-                      placeholder="e.g., Office Floor 3, Server Room"
-                    />
-                    <FormHelperText>
-                      Physical location where the asset is stored or used
-                    </FormHelperText>
-                  </FormControl>
-                </GridItem>
-              </Grid>
-            </CardBody>
-          </Card>
-
-          {/* Financial & Warranty Section */}
-          <Card>
-            <CardHeader>
-              <Heading size="md">Financial & Warranty Information</Heading>
-            </CardHeader>
-            <CardBody>
-              <Grid templateColumns={{ base: '1fr', md: 'repeat(2, 1fr)' }} gap={6}>
-                
-                {/* Purchase Date */}
-                <GridItem>
-                  <FormControl isInvalid={Boolean(errors.purchase_date)} isRequired>
-                    <FormLabel>Purchase Date</FormLabel>
-                    <Input
-                      type="date"
-                      value={formData.purchase_date}
-                      onChange={(e) => handleFieldChange('purchase_date', e.target.value)}
-                    />
-                    <FormErrorMessage>{errors.purchase_date}</FormErrorMessage>
-                  </FormControl>
-                </GridItem>
-
-                {/* Warranty Expiry */}
-                <GridItem>
-                  <FormControl isInvalid={Boolean(errors.warranty_expiry)} isRequired>
-                    <FormLabel>Warranty Expiry Date</FormLabel>
-                    <Input
-                      type="date"
-                      value={formData.warranty_expiry}
-                      onChange={(e) => handleFieldChange('warranty_expiry', e.target.value)}
-                    />
-                    <FormErrorMessage>{errors.warranty_expiry}</FormErrorMessage>
-                  </FormControl>
-                </GridItem>
-
-                {/* Purchase Cost */}
-                <GridItem>
-                  <FormControl isInvalid={Boolean(errors.purchase_cost)}>
-                    <FormLabel>Purchase Cost</FormLabel>
-                    <InputGroup>
-                      <InputLeftAddon>$</InputLeftAddon>
+                  {/* Brand */}
+                  <GridItem>
+                    <FormControl isInvalid={Boolean(errors.brand)} isRequired>
+                      <FormLabel color="white" fontWeight="semibold" fontSize="md">
+                        🏷️ Brand <Text as="span" color="red.300">*</Text>
+                      </FormLabel>
                       <Input
-                        value={formData.purchase_cost}
-                        onChange={(e) => handleFieldChange('purchase_cost', e.target.value)}
-                        placeholder="0.00"
+                        value={formData.brand}
+                        onChange={(e) => handleFieldChange('brand', e.target.value)}
+                        placeholder="e.g., Dell, Apple, HP"
+                        bg="rgba(255, 255, 255, 0.1)"
+                        border="1px solid rgba(255, 255, 255, 0.2)"
+                        color="white"
+                        _placeholder={{ color: 'gray.400' }}
+                        _hover={{ borderColor: 'rgba(255, 255, 255, 0.3)' }}
+                        _focus={{ 
+                          borderColor: 'blue.300',
+                          boxShadow: '0 0 0 1px rgba(59, 130, 246, 0.5)',
+                        }}
                       />
-                    </InputGroup>
-                    <FormErrorMessage>{errors.purchase_cost}</FormErrorMessage>
-                    <FormHelperText>
-                      Original purchase cost (optional)
-                    </FormHelperText>
-                  </FormControl>
-                </GridItem>
-              </Grid>
-            </CardBody>
-          </Card>
+                      <FormErrorMessage>{errors.brand}</FormErrorMessage>
+                    </FormControl>
+                  </GridItem>
 
-          {/* Organizational Information Section */}
-          <Card>
-            <CardHeader>
-              <Heading size="md">Organizational Information</Heading>
+                  {/* Model */}
+                  <GridItem>
+                    <FormControl isInvalid={Boolean(errors.model)} isRequired>
+                      <FormLabel color="white" fontWeight="semibold" fontSize="md">
+                        📱 Model <Text as="span" color="red.300">*</Text>
+                      </FormLabel>
+                      <Input
+                        value={formData.model}
+                        onChange={(e) => handleFieldChange('model', e.target.value)}
+                        placeholder="e.g., XPS 13, MacBook Pro"
+                        bg="rgba(255, 255, 255, 0.1)"
+                        border="1px solid rgba(255, 255, 255, 0.2)"
+                        color="white"
+                        _placeholder={{ color: 'gray.400' }}
+                        _hover={{ borderColor: 'rgba(255, 255, 255, 0.3)' }}
+                        _focus={{ 
+                          borderColor: 'blue.300',
+                          boxShadow: '0 0 0 1px rgba(59, 130, 246, 0.5)',
+                        }}
+                      />
+                      <FormErrorMessage>{errors.model}</FormErrorMessage>
+                    </FormControl>
+                  </GridItem>
+                </Grid>
+              </CardBody>
+            </Card>
+
+            {/* Physical Details Section */}
+            <Card
+              bg="rgba(255, 255, 255, 0.1)"
+              backdropFilter="blur(10px)"
+              borderRadius="20px"
+              border="1px solid rgba(255, 255, 255, 0.1)"
+              boxShadow="0 8px 32px 0 rgba(31, 38, 135, 0.37)"
+            >
+              <CardHeader pb={2}>
+                <VStack align="start" spacing={1}>
+                  <Heading size="md" color="white" display="flex" alignItems="center" gap={3}>
+                    📦 Physical Details
+                  </Heading>
+                  <Text color="gray.300" fontSize="sm">
+                    Physical characteristics and location information
+                  </Text>
+                </VStack>
+              </CardHeader>
+              <CardBody>
+                <Grid templateColumns={{ base: '1fr', md: 'repeat(2, 1fr)' }} gap={6}>
+                  
+                  {/* Serial Number */}
+                  <GridItem>
+                    <FormControl>
+                      <FormLabel color="white" fontWeight="semibold" fontSize="md">
+                        🏷️ Serial Number
+                      </FormLabel>
+                      <Input
+                        value={formData.serial_number}
+                        onChange={(e) => handleFieldChange('serial_number', e.target.value)}
+                        placeholder="Enter manufacturer serial number"
+                        bg="rgba(255, 255, 255, 0.1)"
+                        border="1px solid rgba(255, 255, 255, 0.2)"
+                        color="white"
+                        _placeholder={{ color: 'gray.400' }}
+                        _hover={{ borderColor: 'rgba(255, 255, 255, 0.3)' }}
+                        _focus={{ 
+                          borderColor: 'blue.300',
+                          boxShadow: '0 0 0 1px rgba(59, 130, 246, 0.5)',
+                        }}
+                      />
+                      <FormHelperText color="gray.200" fontSize="sm">
+                        💡 Optional: Unique identifier from manufacturer
+                      </FormHelperText>
+                    </FormControl>
+                  </GridItem>
+
+                  {/* Condition */}
+                  <GridItem>
+                    <FormControl>
+                      <FormLabel color="white" fontWeight="semibold" fontSize="md">
+                        ⚡ Asset Condition
+                      </FormLabel>
+                      <Select
+                        value={formData.condition}
+                        onChange={(e) => handleFieldChange('condition', e.target.value)}
+                        bg="rgba(255, 255, 255, 0.1)"
+                        border="1px solid rgba(255, 255, 255, 0.2)"
+                        color="white"
+                        _hover={{ borderColor: 'rgba(255, 255, 255, 0.3)' }}
+                        _focus={{ 
+                          borderColor: 'blue.300',
+                          boxShadow: '0 0 0 1px rgba(59, 130, 246, 0.5)',
+                        }}
+                      >
+                        {CONDITIONS.map(condition => (
+                          <option key={condition.value} value={condition.value} style={{ background: '#2D3748', color: 'white' }}>
+                            {condition.value}
+                          </option>
+                        ))}
+                      </Select>
+                      <FormHelperText color="gray.200" fontSize="sm">
+                        📊 Current physical state of the asset
+                      </FormHelperText>
+                    </FormControl>
+                  </GridItem>
+
+                  {/* Location */}
+                  <GridItem colSpan={{ base: 1, md: 2 }}>
+                    <FormControl>
+                      <FormLabel color="white" fontWeight="semibold" fontSize="md">
+                        📍 Physical Location
+                      </FormLabel>
+                      <Input
+                        value={formData.location}
+                        onChange={(e) => handleFieldChange('location', e.target.value)}
+                        placeholder="e.g., Office Floor 3, Server Room, Desk A-12"
+                        bg="rgba(255, 255, 255, 0.1)"
+                        border="1px solid rgba(255, 255, 255, 0.2)"
+                        color="white"
+                        _placeholder={{ color: 'gray.400' }}
+                        _hover={{ borderColor: 'rgba(255, 255, 255, 0.3)' }}
+                        _focus={{ 
+                          borderColor: 'blue.300',
+                          boxShadow: '0 0 0 1px rgba(59, 130, 246, 0.5)',
+                        }}
+                      />
+                      <FormHelperText color="gray.200" fontSize="sm">
+                        🏢 Where is this asset physically located?
+                      </FormHelperText>
+                    </FormControl>
+                  </GridItem>
+                </Grid>
+              </CardBody>
+            </Card>
+
+            {/* Financial & Warranty Section */}
+            <Card
+              bg="rgba(255, 255, 255, 0.1)"
+              backdropFilter="blur(10px)"
+              borderRadius="20px"
+              border="1px solid rgba(255, 255, 255, 0.1)"
+              boxShadow="0 8px 32px 0 rgba(31, 38, 135, 0.37)"
+            >
+              <CardHeader pb={2}>
+                <VStack align="start" spacing={1}>
+                  <Heading size="md" color="white" display="flex" alignItems="center" gap={3}>
+                    💰 Financial & Warranty Information
+                  </Heading>
+                  <Text color="gray.300" fontSize="sm">
+                    Purchase details and warranty tracking
+                  </Text>
+                </VStack>
+              </CardHeader>
+              <CardBody>
+                <Grid templateColumns={{ base: '1fr', md: 'repeat(2, 1fr)' }} gap={6}>
+                  
+                  {/* Purchase Date */}
+                  <GridItem>
+                    <FormControl isInvalid={Boolean(errors.purchase_date)} isRequired>
+                      <FormLabel color="white" fontWeight="semibold" fontSize="md">
+                        📅 Purchase Date <Text as="span" color="red.300">*</Text>
+                      </FormLabel>
+                      <Input
+                        type="date"
+                        value={formData.purchase_date}
+                        onChange={(e) => handleFieldChange('purchase_date', e.target.value)}
+                        bg="rgba(255, 255, 255, 0.1)"
+                        border="1px solid rgba(255, 255, 255, 0.2)"
+                        color="white"
+                        _hover={{ borderColor: 'rgba(255, 255, 255, 0.3)' }}
+                        _focus={{ 
+                          borderColor: 'blue.300',
+                          boxShadow: '0 0 0 1px rgba(59, 130, 246, 0.5)',
+                        }}
+                      />
+                      <FormErrorMessage>{errors.purchase_date}</FormErrorMessage>
+                      <FormHelperText color="gray.200" fontSize="sm">
+                        📊 When was this asset purchased?
+                      </FormHelperText>
+                    </FormControl>
+                  </GridItem>
+
+                  {/* Warranty Expiry */}
+                  <GridItem>
+                    <FormControl isInvalid={Boolean(errors.warranty_expiry)} isRequired>
+                      <FormLabel color="white" fontWeight="semibold" fontSize="md">
+                        🛡️ Warranty Expiry Date <Text as="span" color="red.300">*</Text>
+                      </FormLabel>
+                      <Input
+                        type="date"
+                        value={formData.warranty_expiry}
+                        onChange={(e) => handleFieldChange('warranty_expiry', e.target.value)}
+                        bg="rgba(255, 255, 255, 0.1)"
+                        border="1px solid rgba(255, 255, 255, 0.2)"
+                        color="white"
+                        _hover={{ borderColor: 'rgba(255, 255, 255, 0.3)' }}
+                        _focus={{ 
+                          borderColor: 'blue.300',
+                          boxShadow: '0 0 0 1px rgba(59, 130, 246, 0.5)',
+                        }}
+                      />
+                      <FormErrorMessage>{errors.warranty_expiry}</FormErrorMessage>
+                      <FormHelperText color="gray.200" fontSize="sm">
+                        🔒 When does the warranty expire?
+                      </FormHelperText>
+                    </FormControl>
+                  </GridItem>
+
+                  {/* Purchase Cost */}
+                  <GridItem>
+                    <FormControl isInvalid={Boolean(errors.purchase_cost)}>
+                      <FormLabel color="white" fontWeight="semibold" fontSize="md">
+                        💵 Purchase Cost
+                      </FormLabel>
+                      <InputGroup>
+                        <InputLeftAddon 
+                          bg="rgba(255, 255, 255, 0.1)" 
+                          borderColor="rgba(255, 255, 255, 0.2)"
+                          color="white"
+                        >
+                          $
+                        </InputLeftAddon>
+                        <Input
+                          value={formData.purchase_cost}
+                          onChange={(e) => handleFieldChange('purchase_cost', e.target.value)}
+                          placeholder="0.00"
+                          bg="rgba(255, 255, 255, 0.1)"
+                          border="1px solid rgba(255, 255, 255, 0.2)"
+                          color="white"
+                          _placeholder={{ color: 'gray.400' }}
+                          _hover={{ borderColor: 'rgba(255, 255, 255, 0.3)' }}
+                          _focus={{ 
+                            borderColor: 'blue.300',
+                            boxShadow: '0 0 0 1px rgba(59, 130, 246, 0.5)',
+                          }}
+                        />
+                      </InputGroup>
+                      <FormErrorMessage>{errors.purchase_cost}</FormErrorMessage>
+                      <FormHelperText color="gray.200" fontSize="sm">
+                        💡 Optional: Original purchase amount
+                      </FormHelperText>
+                    </FormControl>
+                  </GridItem>
+                </Grid>
+              </CardBody>
+            </Card>
+
+            {/* Organizational Information Section */}
+            <Card
+              bg="rgba(255, 255, 255, 0.1)"
+              backdropFilter="blur(10px)"
+              borderRadius="20px"
+              border="1px solid rgba(255, 255, 255, 0.1)"
+              boxShadow="0 8px 32px 0 rgba(31, 38, 135, 0.37)"
+            >
+                          <CardHeader pb={2}>
+              <VStack align="start" spacing={1}>
+                <Heading size="md" color="white" display="flex" alignItems="center" gap={3}>
+                  🏢 Organizational Information
+                </Heading>
+                <Text color="gray.300" fontSize="sm">
+                  Department assignment and additional notes
+                </Text>
+              </VStack>
             </CardHeader>
             <CardBody>
               <Grid templateColumns={{ base: '1fr', md: 'repeat(1, 1fr)' }} gap={6}>
@@ -653,21 +845,31 @@ const AssetForm: React.FC = () => {
                 {/* Department */}
                 <GridItem>
                   <FormControl isInvalid={Boolean(errors.department)} isRequired>
-                    <FormLabel>Department</FormLabel>
+                    <FormLabel color="white" fontWeight="semibold" fontSize="md">
+                      🏬 Department <Text as="span" color="red.300">*</Text>
+                    </FormLabel>
                     <Select
                       value={formData.department}
                       onChange={(e) => handleFieldChange('department', e.target.value)}
                       placeholder="Select department"
+                      bg="rgba(255, 255, 255, 0.1)"
+                      border="1px solid rgba(255, 255, 255, 0.2)"
+                      color="white"
+                      _hover={{ borderColor: 'rgba(255, 255, 255, 0.3)' }}
+                      _focus={{ 
+                        borderColor: 'blue.300',
+                        boxShadow: '0 0 0 1px rgba(59, 130, 246, 0.5)',
+                      }}
                     >
                       {DEPARTMENTS.map(dept => (
-                        <option key={dept} value={dept}>
+                        <option key={dept} value={dept} style={{ background: '#2D3748', color: 'white' }}>
                           {dept}
                         </option>
                       ))}
                     </Select>
                     <FormErrorMessage>{errors.department}</FormErrorMessage>
-                    <FormHelperText>
-                      Department responsible for this asset
+                    <FormHelperText color="gray.200" fontSize="sm">
+                      👥 Which department will manage this asset?
                     </FormHelperText>
                   </FormControl>
                 </GridItem>
@@ -675,47 +877,88 @@ const AssetForm: React.FC = () => {
                 {/* Notes */}
                 <GridItem>
                   <FormControl>
-                    <FormLabel>Notes</FormLabel>
+                    <FormLabel color="white" fontWeight="semibold" fontSize="md">
+                      📝 Additional Notes
+                    </FormLabel>
                     <Textarea
                       value={formData.notes}
                       onChange={(e) => handleFieldChange('notes', e.target.value)}
-                      placeholder="Additional notes about this asset..."
+                      placeholder="Enter any additional information about this asset..."
                       rows={4}
+                      bg="rgba(255, 255, 255, 0.1)"
+                      border="1px solid rgba(255, 255, 255, 0.2)"
+                      color="white"
+                      _placeholder={{ color: 'gray.400' }}
+                      _hover={{ borderColor: 'rgba(255, 255, 255, 0.3)' }}
+                      _focus={{ 
+                        borderColor: 'blue.300',
+                        boxShadow: '0 0 0 1px rgba(59, 130, 246, 0.5)',
+                      }}
                     />
-                    <FormHelperText>
-                      Any additional information or special instructions
+                    <FormHelperText color="gray.200" fontSize="sm">
+                      💬 Optional: Special instructions, maintenance notes, etc.
                     </FormHelperText>
                   </FormControl>
                 </GridItem>
               </Grid>
             </CardBody>
-          </Card>
+            </Card>
 
-          {/* Form Actions */}
-          <Card>
-            <CardBody>
-              <HStack spacing={4} justify="end">
-                <Button 
-                  variant="outline" 
-                  onClick={handleCancel}
-                  isDisabled={isSubmitting}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  colorScheme="blue"
-                  isLoading={isSubmitting}
-                  loadingText={isEditing ? 'Updating...' : 'Creating...'}
-                >
-                  {isEditing ? 'Update Asset' : 'Create Asset'}
-                </Button>
-              </HStack>
-            </CardBody>
-          </Card>
-        </VStack>
-      </form>
-    </Container>
+            {/* Form Actions */}
+            <Card
+              bg="rgba(255, 255, 255, 0.1)"
+              backdropFilter="blur(10px)"
+              borderRadius="20px"
+              border="1px solid rgba(255, 255, 255, 0.1)"
+              boxShadow="0 8px 32px 0 rgba(31, 38, 135, 0.37)"
+            >
+              <CardBody py={6}>
+                <VStack spacing={4}>
+                  <Text color="gray.200" textAlign="center" fontSize="sm">
+                    🚀 Ready to {isEditing ? 'update' : 'add'} this asset to your inventory?
+                  </Text>
+                  <HStack spacing={4} justify="center">
+                    <Button 
+                      variant="outline" 
+                      onClick={handleCancel}
+                      isDisabled={isSubmitting}
+                      size="lg"
+                      borderColor="rgba(255, 255, 255, 0.3)"
+                      color="white"
+                      _hover={{
+                        bg: 'rgba(255, 255, 255, 0.1)',
+                        borderColor: 'rgba(255, 255, 255, 0.5)',
+                      }}
+                    >
+                      ✖️ Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      size="lg"
+                      bg="rgba(59, 130, 246, 0.8)"
+                      color="white"
+                      fontWeight="bold"
+                      isLoading={isSubmitting}
+                      loadingText={isEditing ? 'Updating Asset...' : 'Creating Asset...'}
+                      _hover={{
+                        bg: 'rgba(59, 130, 246, 1)',
+                        transform: 'translateY(-1px)',
+                        boxShadow: '0 8px 25px rgba(59, 130, 246, 0.3)',
+                      }}
+                      _active={{
+                        transform: 'translateY(0)',
+                      }}
+                    >
+                      {isEditing ? '✅ Update Asset' : '➕ Create Asset'}
+                    </Button>
+                  </HStack>
+                </VStack>
+              </CardBody>
+            </Card>
+          </VStack>
+        </form>
+      </Container>
+    </Box>
   );
 };
 

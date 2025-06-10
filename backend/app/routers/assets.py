@@ -386,9 +386,10 @@ def issue_asset(
     )
     db.add(db_issuance)
     
-    # Update asset status
+    # Update asset status and department (asset follows user's department)
     asset.status = AssetStatus.IN_USE
     asset.assigned_user_id = issuance.user_id
+    asset.department = user.department  # Update department to user's department
     asset.updated_at = datetime.utcnow()
     
     db.commit()
@@ -433,9 +434,10 @@ def return_asset(asset_id: int, db: Session = Depends(get_db)):
     # Update issuance record
     issuance.return_date = datetime.utcnow()
     
-    # Update asset status
+    # Update asset status and reset department back to IT
     asset.status = AssetStatus.AVAILABLE
     asset.assigned_user_id = None
+    asset.department = "IT"  # Reset to IT department when returned
     asset.updated_at = datetime.utcnow()
     
     db.commit()

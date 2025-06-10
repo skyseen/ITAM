@@ -89,19 +89,18 @@ const AssetDetail: React.FC = () => {
 
   // Theme colors for futuristic design
   const bgGradient = useColorModeValue(
-    'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    'linear-gradient(135deg, #1a202c 0%, #2d3748 100%)'
+    'linear(to-br, purple.900, blue.800, teal.700)',
+    'linear(to-br, gray.900, purple.900, blue.900)'
   );
   const cardBg = useColorModeValue(
     'rgba(255, 255, 255, 0.1)',
     'rgba(45, 55, 72, 0.1)'
   );
   const glassEffect = {
-    bg: cardBg,
+    bg: 'rgba(255, 255, 255, 0.1)',
     backdropFilter: 'blur(10px)',
     borderRadius: '20px',
-    border: '1px solid',
-    borderColor: useColorModeValue('rgba(255, 255, 255, 0.2)', 'rgba(255, 255, 255, 0.1)'),
+    border: '1px solid rgba(255, 255, 255, 0.1)',
     boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)',
   };
 

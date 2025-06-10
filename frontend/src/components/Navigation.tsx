@@ -33,6 +33,7 @@ import {
   useColorModeValue,
   Container,
   Badge,
+  Icon,
 } from '@chakra-ui/react';
 import {
   ChevronDownIcon,
@@ -40,6 +41,7 @@ import {
   InfoIcon,
   ViewIcon,
   AddIcon,
+  ExternalLinkIcon,
 } from '@chakra-ui/icons';
 import { useAuth } from '../contexts/AuthContext';
 import { glassEffects, futuristicColors, componentPresets } from '../theme/futuristicTheme';
@@ -233,31 +235,84 @@ const Navigation: React.FC = () => {
                 </MenuButton>
                 <MenuList
                   sx={{
-                    ...glassEffects.secondary,
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    ...glassEffects.primary,
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    boxShadow: '0 20px 50px rgba(0, 0, 0, 0.4)',
+                    bg: 'rgba(30, 41, 59, 0.95)',
+                    backdropFilter: 'blur(20px)',
+                    borderRadius: 'xl',
+                    p: 2,
                   }}
                 >
                   <MenuItem
-                    icon={<InfoIcon />}
                     color="white"
-                    _hover={{ bg: 'rgba(255, 255, 255, 0.1)' }}
+                    fontWeight="medium"
+                    borderRadius="lg"
+                    bg="rgba(6, 182, 212, 0.1)"
+                    mb={1}
+                    _hover={{ 
+                      bg: 'rgba(6, 182, 212, 0.2)',
+                      color: 'cyan.200',
+                      transform: 'translateX(4px) scale(1.02)',
+                      boxShadow: '0 4px 15px rgba(6, 182, 212, 0.3)',
+                    }}
+                    transition="all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
+                    _active={{
+                      transform: 'translateX(4px) scale(0.98)',
+                    }}
                   >
-                    Profile
+                    <HStack spacing={3}>
+                      <InfoIcon color="cyan.300" />
+                      <Text>Profile Settings</Text>
+                    </HStack>
                   </MenuItem>
                   <MenuItem
-                    icon={<SettingsIcon />}
                     color="white"
-                    _hover={{ bg: 'rgba(255, 255, 255, 0.1)' }}
+                    fontWeight="medium"
+                    borderRadius="lg"
+                    bg="rgba(147, 51, 234, 0.1)"
+                    mb={1}
+                    _hover={{ 
+                      bg: 'rgba(147, 51, 234, 0.2)',
+                      color: 'purple.200',
+                      transform: 'translateX(4px) scale(1.02)',
+                      boxShadow: '0 4px 15px rgba(147, 51, 234, 0.3)',
+                    }}
+                    transition="all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
+                    _active={{
+                      transform: 'translateX(4px) scale(0.98)',
+                    }}
                   >
-                    Settings
+                    <HStack spacing={3}>
+                      <SettingsIcon color="purple.300" />
+                      <Text>Preferences</Text>
+                    </HStack>
                   </MenuItem>
-                  <MenuDivider borderColor="rgba(255, 255, 255, 0.1)" />
+                  <MenuDivider 
+                    borderColor="rgba(255, 255, 255, 0.15)" 
+                    my={2}
+                  />
                   <MenuItem
-                    color="red.300"
-                    _hover={{ bg: 'rgba(255, 0, 0, 0.1)' }}
+                    color="white"
+                    fontWeight="medium"
+                    borderRadius="lg"
+                    bg="rgba(239, 68, 68, 0.1)"
+                    _hover={{ 
+                      bg: 'rgba(239, 68, 68, 0.2)',
+                      color: 'red.200',
+                      transform: 'translateX(4px) scale(1.02)',
+                      boxShadow: '0 4px 15px rgba(239, 68, 68, 0.3)',
+                    }}
+                    transition="all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
+                    _active={{
+                      transform: 'translateX(4px) scale(0.98)',
+                    }}
                     onClick={handleLogout}
                   >
-                    Sign out
+                    <HStack spacing={3}>
+                      <ExternalLinkIcon color="red.300" />
+                      <Text>Sign Out Securely</Text>
+                    </HStack>
                   </MenuItem>
                 </MenuList>
               </Menu>

@@ -23,6 +23,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Box,
   Container,
@@ -66,6 +67,7 @@ import {
   AlertDialogHeader,
   AlertDialogContent,
   AlertDialogOverlay,
+  useColorModeValue,
 } from '@chakra-ui/react';
 import {
   SearchIcon,
@@ -110,7 +112,7 @@ const STATUS_COLORS = {
 interface AssetFilters {
   search: string;           // Text search across multiple fields
   status: string;           // Filter by asset status
-  type: string;            // Filter by asset type
+  asset_type: string;       // Filter by asset type (renamed from type)
   department: string;      // Filter by department
 }
 
@@ -318,6 +320,9 @@ const AssetList: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   
+  // Get URL search parameters for filtering
+  const [searchParams] = useSearchParams();
+  
   // Get asset management functions from context
   const { 
     assets, 
@@ -332,13 +337,16 @@ const AssetList: React.FC = () => {
   // Toast notifications for user feedback
   const toast = useToast();
   
+  // Initialize filters from URL parameters
+  const initialFilters: AssetFilters = {
+    search: searchParams.get('search') || '',
+    status: searchParams.get('status') || '',
+    asset_type: searchParams.get('asset_type') || '',
+    department: searchParams.get('department') || '',
+  };
+  
   // State for filtering and search functionality
-  const [filters, setFilters] = useState<AssetFilters>({
-    search: '',
-    status: '',
-    type: '',
-    department: '',
-  });
+  const [filters, setFilters] = useState<AssetFilters>(initialFilters);
   
   // State for pagination control
   const [pagination, setPagination] = useState<PaginationState>({
@@ -488,7 +496,10 @@ const AssetList: React.FC = () => {
   return (
     <Box
       minH="100vh"
-      bgGradient={gradientBackgrounds.primary}
+      bgGradient={useColorModeValue(
+        'linear(to-br, purple.900, blue.800, teal.700)',
+        'linear(to-br, gray.900, purple.900, blue.900)'
+      )}
       position="relative"
     >
       <Container maxW="8xl" py={8}>
@@ -524,7 +535,13 @@ const AssetList: React.FC = () => {
         </HStack>
 
         {/* Filters and Search Section */}
-        <Card sx={{ ...glassEffects.primary }}>
+        <Card 
+          bg="rgba(255, 255, 255, 0.1)"
+          backdropFilter="blur(10px)"
+          borderRadius="20px"
+          border="1px solid rgba(255, 255, 255, 0.1)"
+          boxShadow="0 8px 32px 0 rgba(31, 38, 135, 0.37)"
+        >
           <CardBody>
             <VStack spacing={4}>
               <Text 
@@ -548,6 +565,15 @@ const AssetList: React.FC = () => {
                     placeholder="Search assets by ID, brand, model, or serial number..."
                     value={filters.search}
                     onChange={(e) => handleFilterChange('search', e.target.value)}
+                    bg="rgba(255, 255, 255, 0.1)"
+                    border="1px solid rgba(255, 255, 255, 0.2)"
+                    color="white"
+                    _placeholder={{ color: 'gray.400' }}
+                    _hover={{ borderColor: 'rgba(255, 255, 255, 0.3)' }}
+                    _focus={{ 
+                      borderColor: 'blue.300',
+                      boxShadow: '0 0 0 1px rgba(59, 130, 246, 0.5)',
+                    }}
                   />
                 </InputGroup>
                 
@@ -557,26 +583,45 @@ const AssetList: React.FC = () => {
                   value={filters.status}
                   onChange={(e) => handleFilterChange('status', e.target.value)}
                   minW="150px"
+                  bg="rgba(255, 255, 255, 0.1)"
+                  border="1px solid rgba(255, 255, 255, 0.2)"
+                  color="white"
+                  _hover={{ borderColor: 'rgba(255, 255, 255, 0.3)' }}
+                  _focus={{ 
+                    borderColor: 'blue.300',
+                    boxShadow: '0 0 0 1px rgba(59, 130, 246, 0.5)',
+                  }}
                 >
-                  <option value="available">Available</option>
-                  <option value="in_use">In Use</option>
-                  <option value="maintenance">Maintenance</option>
-                  <option value="retired">Retired</option>
+                  <option value="available" style={{ background: '#2D3748', color: 'white' }}>Available</option>
+                  <option value="in_use" style={{ background: '#2D3748', color: 'white' }}>In Use</option>
+                  <option value="maintenance" style={{ background: '#2D3748', color: 'white' }}>Maintenance</option>
+                  <option value="retired" style={{ background: '#2D3748', color: 'white' }}>Retired</option>
                 </Select>
                 
                 {/* Type Filter */}
                 <Select
                   placeholder="All Types"
-                  value={filters.type}
-                  onChange={(e) => handleFilterChange('type', e.target.value)}
+                  value={filters.asset_type}
+                  onChange={(e) => handleFilterChange('asset_type', e.target.value)}
                   minW="150px"
+                  bg="rgba(255, 255, 255, 0.1)"
+                  border="1px solid rgba(255, 255, 255, 0.2)"
+                  color="white"
+                  _hover={{ borderColor: 'rgba(255, 255, 255, 0.3)' }}
+                  _focus={{ 
+                    borderColor: 'blue.300',
+                    boxShadow: '0 0 0 1px rgba(59, 130, 246, 0.5)',
+                  }}
                 >
-                  <option value="laptop">Laptop</option>
-                  <option value="desktop">Desktop</option>
-                  <option value="monitor">Monitor</option>
-                  <option value="printer">Printer</option>
-                  <option value="server">Server</option>
-                  <option value="router">Router</option>
+                  <option value="Laptop" style={{ background: '#2D3748', color: 'white' }}>Laptop</option>
+                  <option value="Desktop" style={{ background: '#2D3748', color: 'white' }}>Desktop</option>
+                  <option value="Monitor" style={{ background: '#2D3748', color: 'white' }}>Monitor</option>
+                  <option value="Printer" style={{ background: '#2D3748', color: 'white' }}>Printer</option>
+                  <option value="Server" style={{ background: '#2D3748', color: 'white' }}>Server</option>
+                  <option value="Router" style={{ background: '#2D3748', color: 'white' }}>Router</option>
+                  <option value="Switch" style={{ background: '#2D3748', color: 'white' }}>Switch</option>
+                  <option value="Tablet" style={{ background: '#2D3748', color: 'white' }}>Tablet</option>
+                  <option value="Phone" style={{ background: '#2D3748', color: 'white' }}>Phone</option>
                 </Select>
                 
                 {/* Department Filter */}
@@ -585,13 +630,21 @@ const AssetList: React.FC = () => {
                   value={filters.department}
                   onChange={(e) => handleFilterChange('department', e.target.value)}
                   minW="150px"
+                  bg="rgba(255, 255, 255, 0.1)"
+                  border="1px solid rgba(255, 255, 255, 0.2)"
+                  color="white"
+                  _hover={{ borderColor: 'rgba(255, 255, 255, 0.3)' }}
+                  _focus={{ 
+                    borderColor: 'blue.300',
+                    boxShadow: '0 0 0 1px rgba(59, 130, 246, 0.5)',
+                  }}
                 >
-                  <option value="IT">IT</option>
-                  <option value="Engineering">Engineering</option>
-                  <option value="Marketing">Marketing</option>
-                  <option value="Finance">Finance</option>
-                  <option value="HR">HR</option>
-                  <option value="Sales">Sales</option>
+                  <option value="IT" style={{ background: '#2D3748', color: 'white' }}>IT</option>
+                  <option value="Engineering" style={{ background: '#2D3748', color: 'white' }}>Engineering</option>
+                  <option value="Marketing" style={{ background: '#2D3748', color: 'white' }}>Marketing</option>
+                  <option value="Finance" style={{ background: '#2D3748', color: 'white' }}>Finance</option>
+                  <option value="HR" style={{ background: '#2D3748', color: 'white' }}>HR</option>
+                  <option value="Sales" style={{ background: '#2D3748', color: 'white' }}>Sales</option>
                 </Select>
               </HStack>
             </VStack>
@@ -600,7 +653,13 @@ const AssetList: React.FC = () => {
       </VStack>
 
       {/* Assets Table */}
-      <Card sx={{ ...glassEffects.primary }}>
+      <Card 
+        bg="rgba(255, 255, 255, 0.1)"
+        backdropFilter="blur(10px)"
+        borderRadius="20px"
+        border="1px solid rgba(255, 255, 255, 0.1)"
+        boxShadow="0 8px 32px 0 rgba(31, 38, 135, 0.37)"
+      >
         <CardBody p={0}>
           {loading ? (
             // Loading State

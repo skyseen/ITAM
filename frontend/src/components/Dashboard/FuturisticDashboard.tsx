@@ -39,7 +39,7 @@ import {
   FiActivity,
   FiAlertCircle,
 } from 'react-icons/fi';
-import { ViewIcon, ArrowForwardIcon, InfoIcon, WarningIcon } from '@chakra-ui/icons';
+import { ViewIcon, ArrowForwardIcon, InfoIcon, WarningIcon, TimeIcon } from '@chakra-ui/icons';
 import { useAssets } from '../../contexts/AssetContext';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -201,20 +201,25 @@ const CircularStatCard: React.FC<CircularStatCardProps> = ({ title, data, total,
                 bg="rgba(255,255,255,0.05)"
                 cursor={onClick ? "pointer" : "default"}
                 _hover={onClick ? { bg: "rgba(255,255,255,0.1)" } : {}}
-                onClick={() => onClick && onClick(status)}
+                onClick={() => onClick?.(status)}
               >
                 <HStack>
                   <Box
                     w={3}
                     h={3}
                     borderRadius="full"
-                    bg={`${statusColors[status as keyof typeof statusColors]}.400`}
+                    bg={`${statusColors[status as keyof typeof statusColors] || 'gray'}.400`}
                   />
                   <Text color="gray.300" fontSize="sm" textTransform="capitalize">
                     {status.replace('_', ' ')}
                   </Text>
                 </HStack>
-                <Text color="white" fontWeight="medium">{count}</Text>
+                <Badge 
+                  colorScheme={statusColors[status as keyof typeof statusColors] || 'gray'}
+                  variant="subtle"
+                >
+                  {count}
+                </Badge>
               </HStack>
             ))}
           </VStack>
@@ -225,7 +230,7 @@ const CircularStatCard: React.FC<CircularStatCardProps> = ({ title, data, total,
 };
 
 /**
- * Recent Activity Feed
+ * Activity Feed Component
  */
 interface ActivityFeedProps {
   activities: any[];
@@ -233,7 +238,6 @@ interface ActivityFeedProps {
 }
 
 const ActivityFeed: React.FC<ActivityFeedProps> = ({ activities, onViewAll }) => {
-  const { assets } = useAssets();
   const cardBg = useColorModeValue(
     'rgba(255, 255, 255, 0.1)',
     'rgba(45, 55, 72, 0.1)'
@@ -248,64 +252,55 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ activities, onViewAll }) =>
     boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)',
   };
 
-  // Get recent assignments from assets that are in_use
-  const recentAssignments = assets
-    .filter(asset => asset.status === 'in_use' && asset.assigned_user_name)
-    .slice(0, 5);
-
   return (
     <Card {...glassEffect}>
       <CardHeader>
         <HStack justify="space-between">
           <HStack>
-            <WarningIcon color="cyan.300" />
+            <TimeIcon color="cyan.300" boxSize={5} />
             <Heading size="md" color="white">Recent Activity</Heading>
           </HStack>
-          {onViewAll && (
-            <Button
-              size="sm"
-              variant="ghost"
-              color="cyan.300"
-              onClick={onViewAll}
-              _hover={{ bg: 'rgba(6, 182, 212, 0.1)' }}
-            >
-              View All
-            </Button>
-          )}
+          <Button
+            size="sm"
+            variant="ghost"
+            rightIcon={<ViewIcon />}
+            color="cyan.300"
+            onClick={onViewAll}
+            _hover={{ bg: 'rgba(0, 255, 255, 0.1)' }}
+          >
+            View All
+          </Button>
         </HStack>
       </CardHeader>
       <CardBody>
-        <VStack spacing={4} align="stretch" maxH="300px" overflowY="auto">
-          {recentAssignments.length > 0 ? (
-            recentAssignments.map((asset, index) => (
-              <HStack
-                key={asset.id}
-                p={3}
-                bg="rgba(255,255,255,0.05)"
+        <VStack spacing={4} align="stretch">
+          {activities.length === 0 ? (
+            <Text color="gray.400" textAlign="center" py={4}>
+              No recent activity
+            </Text>
+          ) : (
+            activities.slice(0, 5).map((activity, index) => (
+              <HStack 
+                key={index} 
+                p={3} 
+                bg="rgba(255,255,255,0.05)" 
                 borderRadius="md"
                 spacing={3}
-                _hover={{ bg: "rgba(255,255,255,0.1)" }}
-                cursor="pointer"
               >
-                <Avatar name={asset.assigned_user_name} size="sm" />
+                <Avatar size="sm" name={activity.user_name} bg="cyan.500" />
                 <VStack align="start" spacing={0} flex={1}>
                   <Text color="white" fontSize="sm" fontWeight="medium">
-                    {asset.asset_id} ({asset.type}) → {asset.assigned_user_name}
+                    {activity.asset_id} → {activity.user_name}
                   </Text>
                   <Text color="gray.400" fontSize="xs">
-                    Department: {asset.department}
-                  </Text>
-                  <Text color="gray.400" fontSize="xs">
-                    Updated: {new Date(asset.updated_at).toLocaleDateString()}
+                    {new Date(activity.issued_date).toLocaleDateString()}
                   </Text>
                 </VStack>
-                <Badge colorScheme="green" size="sm">In Use</Badge>
+                <Badge colorScheme="cyan" variant="subtle">
+                  Assigned
+                </Badge>
               </HStack>
             ))
-          ) : (
-            <Text color="gray.400" textAlign="center" py={4}>
-              No recent asset assignments
-            </Text>
           )}
         </VStack>
       </CardBody>
@@ -314,17 +309,17 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ activities, onViewAll }) =>
 };
 
 /**
- * Main Futuristic Dashboard Component
+ * Main Dashboard Component
  */
 const FuturisticDashboard: React.FC = () => {
   const navigate = useNavigate();
+  const { dashboardData, fetchDashboardData, loading } = useAssets();
   const { user } = useAuth();
-  const { dashboardData, loading, fetchDashboardData } = useAssets();
-  
-  // Theme for futuristic background
+
+  // Glass-morphism background gradient
   const bgGradient = useColorModeValue(
-    'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    'linear-gradient(135deg, #1a202c 0%, #2d3748 100%)'
+    'linear(to-br, purple.900, blue.800, teal.700)',
+    'linear(to-br, gray.900, purple.900, blue.900)'
   );
 
   useEffect(() => {
@@ -352,10 +347,10 @@ const FuturisticDashboard: React.FC = () => {
     );
   }
 
-  const handleAssetFilter = (status?: string, type?: string, department?: string) => {
+  const handleAssetFilter = (status?: string, asset_type?: string, department?: string) => {
     const params = new URLSearchParams();
     if (status) params.set('status', status);
-    if (type) params.set('type', type);
+    if (asset_type) params.set('asset_type', asset_type);
     if (department) params.set('department', department);
     navigate(`/assets?${params.toString()}`);
   };

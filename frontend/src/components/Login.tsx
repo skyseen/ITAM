@@ -31,6 +31,7 @@ import {
   Text,
   HStack,
   Icon,
+  useColorModeValue,
 } from '@chakra-ui/react';
 import { LockIcon } from '@chakra-ui/icons';
 import { useAuth } from '../contexts/AuthContext';
@@ -66,7 +67,10 @@ const Login: React.FC = () => {
   return (
     <Box
       minH="100vh"
-      bgGradient={gradientBackgrounds.primary}
+      bgGradient={useColorModeValue(
+        'linear(to-br, purple.900, blue.800, teal.700)',
+        'linear(to-br, gray.900, purple.900, blue.900)'
+      )}
       display="flex"
       alignItems="center"
       justifyContent="center"
