@@ -73,6 +73,7 @@ const navigationItems: NavItem[] = [
     path: '/assets',
     icon: <InfoIcon />,
     requiresAuth: true,
+    roles: ['admin', 'manager'], // Only admin and manager can access assets page
   },
   {
     label: 'Add Asset',

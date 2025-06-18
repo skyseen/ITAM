@@ -1,8 +1,9 @@
 /**
- * AssetDetail Component - Futuristic Asset Detail View
+ * AssetDetail Component - Asset Detail View with Document Signing Integration
  * 
  * This component provides a comprehensive view of a single asset with all its details,
- * history, and actions. Features a modern, futuristic design with glass-morphism effects.
+ * history, actions, and pending document signatures. Integrates with the electronic
+ * signature workflow for asset issuance compliance.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -21,45 +22,44 @@ import {
   HStack,
   Button,
   Divider,
-  Table,
-  Tbody,
-  Tr,
-  Td,
   Avatar,
   Skeleton,
   useColorModeValue,
-  Icon,
   Flex,
   useToast,
   Alert,
   AlertIcon,
   AlertDescription,
-  Modal,
-  ModalOverlay,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ModalCloseButton,
   useDisclosure,
+  List,
+  ListItem,
+  ListIcon,
+  Progress,
 } from '@chakra-ui/react';
 import {
   ArrowBackIcon,
   EditIcon,
   InfoIcon,
   CalendarIcon,
-  ViewIcon,
   CheckIcon,
   WarningIcon,
   TimeIcon,
-  BellIcon,
-  StarIcon,
-  SettingsIcon,
-  AttachmentIcon,
-  ExternalLinkIcon,
 } from '@chakra-ui/icons';
 import { useAssets, Asset } from '../contexts/AssetContext';
 import { useAuth } from '../contexts/AuthContext';
-// import IssueAssetModal from './IssueAssetModal';
+import IssueAssetModal from './IssueAssetModal';
+import ElectronicSignature from './ElectronicSignature';
+
+/**
+ * Document interface for pending signatures
+ */
+interface PendingDocument {
+  id: number;
+  document_type: string;
+  status: string;
+  created_at: string;
+  expires_at: string;
+}
 
 /**
  * Status color mapping for consistent theming
@@ -72,6 +72,15 @@ const STATUS_COLORS = {
 } as const;
 
 /**
+ * Document type display names
+ */
+const DOCUMENT_NAMES = {
+  declaration_form: 'Declaration Form for Holding Company IT Asset',
+  it_orientation: 'IT Orientation Acknowledgment Form',
+  handover_form: 'Equipment Takeover/Handover Form',
+};
+
+/**
  * Main AssetDetail Component
  */
 const AssetDetail: React.FC = () => {
@@ -82,20 +91,19 @@ const AssetDetail: React.FC = () => {
   const { assets, loading, fetchAssets, returnAsset } = useAssets();
   
   const [asset, setAsset] = useState<Asset | null>(null);
-  const [assetHistory, setAssetHistory] = useState<any[]>([]);
-  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [pendingDocuments, setPendingDocuments] = useState<PendingDocument[]>([]);
+  const [loadingDocuments, setLoadingDocuments] = useState(false);
+  const [currentDocumentType, setCurrentDocumentType] = useState<string>('');
   
   const { isOpen: isIssueOpen, onOpen: onIssueOpen, onClose: onIssueClose } = useDisclosure();
+  const { isOpen: isSigningOpen, onOpen: onSigningOpen, onClose: onSigningClose } = useDisclosure();
 
   // Theme colors for futuristic design
   const bgGradient = useColorModeValue(
     'linear(to-br, purple.900, blue.800, teal.700)',
     'linear(to-br, gray.900, purple.900, blue.900)'
   );
-  const cardBg = useColorModeValue(
-    'rgba(255, 255, 255, 0.1)',
-    'rgba(45, 55, 72, 0.1)'
-  );
+  
   const glassEffect = {
     bg: 'rgba(255, 255, 255, 0.1)',
     backdropFilter: 'blur(10px)',
@@ -117,31 +125,55 @@ const AssetDetail: React.FC = () => {
   }, [id, assets, fetchAssets]);
 
   useEffect(() => {
-    // Simulate fetching asset history (implement API call here)
-    if (asset) {
-      setLoadingHistory(true);
-      // TODO: Implement actual history fetching
-      setTimeout(() => {
-        setAssetHistory([
-          {
-            id: 1,
-            action: 'Created',
-            date: asset.created_at,
-            user: 'System',
-            details: 'Asset added to inventory'
-          },
-          {
-            id: 2,
-            action: 'Issued',
-            date: '2023-06-01T10:00:00',
-            user: 'Admin',
-            details: `Issued to ${asset.assigned_user_name || 'User'}`
-          }
-        ]);
-        setLoadingHistory(false);
-      }, 1000);
+    // Fetch pending documents for the current user and asset
+    if (asset && user) {
+      fetchPendingDocuments();
     }
-  }, [asset]);
+  }, [asset, user]);
+
+  const fetchPendingDocuments = async () => {
+    if (!asset || !user) return;
+    
+    setLoadingDocuments(true);
+    try {
+      const response = await fetch(`http://localhost:8000/api/documents/asset/${asset.id}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+        },
+      });
+      
+      if (response.ok) {
+        const documents = await response.json();
+        
+        // Filter for pending documents for current user
+        const userPendingDocs = documents.filter((doc: any) => 
+          doc.status === 'pending' && doc.user_id === user.id
+        );
+        setPendingDocuments(userPendingDocs);
+      }
+    } catch (error) {
+      console.error('Failed to fetch pending documents:', error);
+    } finally {
+      setLoadingDocuments(false);
+    }
+  };
+
+  const handleSignDocument = (documentType: string) => {
+    setCurrentDocumentType(documentType);
+    onSigningOpen();
+  };
+
+  const handleSigningComplete = () => {
+    // Refresh pending documents after signing
+    fetchPendingDocuments();
+    onSigningClose();
+    toast({
+      title: 'Document Signed Successfully',
+      description: 'Your electronic signature has been recorded',
+      status: 'success',
+      duration: 3000,
+    });
+  };
 
   const handleReturn = async () => {
     if (!asset) return;
@@ -169,6 +201,7 @@ const AssetDetail: React.FC = () => {
   const canEdit = user?.role === 'admin' || user?.role === 'manager';
   const canIssue = asset?.status === 'available' && canEdit;
   const canReturn = asset?.status === 'in_use' && canEdit;
+  const isAssignedToCurrentUser = asset?.assigned_user_id === user?.id;
 
   if (loading && !asset) {
     return (
@@ -200,13 +233,15 @@ const AssetDetail: React.FC = () => {
     <Box minH="100vh" bgGradient={bgGradient}>
       <Container maxW="6xl" py={8}>
         {/* Header */}
-        <Flex justify="space-between" align="center" mb={8}>
-          <HStack spacing={4}>
+        <HStack justify="space-between" mb={8}>
+          <HStack>
             <Button
               leftIcon={<ArrowBackIcon />}
-              variant="ghost"
+              variant="outline"
               onClick={() => navigate('/assets')}
               color="white"
+              borderColor="rgba(255, 255, 255, 0.3)"
+              _hover={{ bg: 'rgba(255, 255, 255, 0.1)' }}
             >
               Back to Assets
             </Button>
@@ -218,7 +253,7 @@ const AssetDetail: React.FC = () => {
           <HStack spacing={4}>
             {canEdit && (
               <Button
-                                    leftIcon={<EditIcon />}
+                leftIcon={<EditIcon />}
                 colorScheme="blue"
                 onClick={() => navigate(`/assets/${asset.id}/edit`)}
               >
@@ -227,7 +262,7 @@ const AssetDetail: React.FC = () => {
             )}
             {canIssue && (
               <Button
-                                    leftIcon={<InfoIcon />}
+                leftIcon={<CheckIcon />}
                 colorScheme="green"
                 onClick={onIssueOpen}
               >
@@ -236,7 +271,7 @@ const AssetDetail: React.FC = () => {
             )}
             {canReturn && (
               <Button
-                                    leftIcon={<TimeIcon />}
+                leftIcon={<ArrowBackIcon />}
                 colorScheme="orange"
                 onClick={handleReturn}
               >
@@ -244,206 +279,237 @@ const AssetDetail: React.FC = () => {
               </Button>
             )}
           </HStack>
-        </Flex>
+        </HStack>
 
         <Grid templateColumns={{ base: '1fr', lg: '2fr 1fr' }} gap={8}>
           {/* Main Asset Information */}
           <VStack spacing={6} align="stretch">
-            {/* Basic Information Card */}
+            {/* Asset Overview Card */}
             <Card {...glassEffect}>
               <CardHeader>
-                <HStack>
-                                        <InfoIcon color="blue.300" />
-                  <Heading size="md" color="white">Asset Information</Heading>
+                <HStack justify="space-between">
+                  <Heading size="md" color="white">Asset Overview</Heading>
+                  <Badge 
+                    colorScheme={STATUS_COLORS[asset.status as keyof typeof STATUS_COLORS]}
+                    size="lg"
+                    textTransform="capitalize"
+                  >
+                    {asset.status.replace('_', ' ')}
+                  </Badge>
                 </HStack>
               </CardHeader>
               <CardBody>
                 <Grid templateColumns="repeat(2, 1fr)" gap={6}>
-                  <VStack align="start" spacing={4}>
-                    <Box>
-                      <Text fontSize="sm" color="gray.300">Asset ID</Text>
-                      <Text fontSize="lg" fontWeight="bold" color="white">
-                        {asset.asset_id}
-                      </Text>
-                    </Box>
+                  <VStack align="start" spacing={3}>
                     <Box>
                       <Text fontSize="sm" color="gray.300">Type</Text>
-                      <Text fontSize="lg" color="white" textTransform="capitalize">
-                        {asset.type}
-                      </Text>
+                      <Text color="white" fontWeight="semibold">{asset.type}</Text>
                     </Box>
                     <Box>
                       <Text fontSize="sm" color="gray.300">Brand</Text>
-                      <Text fontSize="lg" color="white">{asset.brand}</Text>
+                      <Text color="white" fontWeight="semibold">{asset.brand}</Text>
                     </Box>
                     <Box>
                       <Text fontSize="sm" color="gray.300">Model</Text>
-                      <Text fontSize="lg" color="white">{asset.model}</Text>
-                    </Box>
-                  </VStack>
-                  
-                  <VStack align="start" spacing={4}>
-                    <Box>
-                      <Text fontSize="sm" color="gray.300">Status</Text>
-                      <Badge 
-                        colorScheme={STATUS_COLORS[asset.status as keyof typeof STATUS_COLORS]}
-                        size="lg"
-                        textTransform="capitalize"
-                      >
-                        {asset.status.replace('_', ' ')}
-                      </Badge>
+                      <Text color="white" fontWeight="semibold">{asset.model}</Text>
                     </Box>
                     <Box>
                       <Text fontSize="sm" color="gray.300">Department</Text>
-                      <Text fontSize="lg" color="white">{asset.department}</Text>
+                      <Text color="white" fontWeight="semibold">{asset.department}</Text>
                     </Box>
+                  </VStack>
+                  
+                  <VStack align="start" spacing={3}>
                     <Box>
-                      <Text fontSize="sm" color="gray.300">Serial Number</Text>
-                      <Text fontSize="lg" color="white">
-                        {asset.serial_number || 'N/A'}
+                      <Text fontSize="sm" color="gray.300">Purchase Date</Text>
+                      <Text color="white" fontWeight="semibold">
+                        {new Date(asset.purchase_date).toLocaleDateString()}
                       </Text>
                     </Box>
                     <Box>
-                      <Text fontSize="sm" color="gray.300">Location</Text>
+                      <Text fontSize="sm" color="gray.300">Warranty Status</Text>
                       <HStack>
-                        <ViewIcon color="green.300" />
-                        <Text fontSize="lg" color="white">
-                          {asset.location || 'Not specified'}
+                        {warrantyDays > 30 ? (
+                          <CheckIcon color="green.400" />
+                        ) : warrantyDays > 0 ? (
+                          <WarningIcon color="orange.400" />
+                        ) : (
+                          <TimeIcon color="red.400" />
+                        )}
+                        <Text 
+                          color={warrantyDays > 30 ? "green.400" : warrantyDays > 0 ? "orange.400" : "red.400"}
+                          fontWeight="semibold"
+                        >
+                          {warrantyDays > 0 ? `${warrantyDays} days left` : 'Expired'}
                         </Text>
                       </HStack>
                     </Box>
+                    {asset.assigned_user_name && (
+                      <Box>
+                        <Text fontSize="sm" color="gray.300">Assigned To</Text>
+                        <HStack>
+                          <Avatar size="sm" name={asset.assigned_user_name} />
+                          <Text color="white" fontWeight="semibold">{asset.assigned_user_name}</Text>
+                        </HStack>
+                      </Box>
+                    )}
                   </VStack>
                 </Grid>
               </CardBody>
             </Card>
 
-            {/* Financial Information */}
-            <Card {...glassEffect}>
-              <CardHeader>
-                <HStack>
-                  <CheckIcon color="green.300" />
-                  <Heading size="md" color="white">Financial & Warranty</Heading>
-                </HStack>
-              </CardHeader>
-              <CardBody>
-                <Grid templateColumns="repeat(3, 1fr)" gap={6}>
-                  <Box>
-                    <Text fontSize="sm" color="gray.300">Purchase Cost</Text>
-                    <Text fontSize="lg" fontWeight="bold" color="green.300">
-                      {asset.purchase_cost || 'N/A'}
-                    </Text>
-                  </Box>
-                  <Box>
-                    <Text fontSize="sm" color="gray.300">Purchase Date</Text>
-                    <HStack>
-                      <CalendarIcon color="blue.300" />
-                      <Text fontSize="lg" color="white">
-                        {new Date(asset.purchase_date).toLocaleDateString()}
-                      </Text>
-                    </HStack>
-                  </Box>
-                  <Box>
-                    <Text fontSize="sm" color="gray.300">Warranty Status</Text>
-                    <VStack align="start" spacing={1}>
-                      <Badge 
-                        colorScheme={warrantyDays < 0 ? 'red' : warrantyDays <= 30 ? 'orange' : 'green'}
-                      >
-                        {warrantyDays < 0 ? 'Expired' : `${warrantyDays} days left`}
-                      </Badge>
-                      <Text fontSize="sm" color="gray.400">
-                        Expires: {new Date(asset.warranty_expiry).toLocaleDateString()}
-                      </Text>
-                    </VStack>
-                  </Box>
-                </Grid>
-              </CardBody>
-            </Card>
+            {/* Pending Documents Card (only show if user has pending docs) */}
+            {isAssignedToCurrentUser && pendingDocuments.length > 0 && (
+              <Card {...glassEffect}>
+                <CardHeader>
+                  <HStack>
+                    <InfoIcon color="yellow.400" />
+                    <Heading size="md" color="white">Pending Document Signatures</Heading>
+                  </HStack>
+                </CardHeader>
+                <CardBody>
+                  <Alert status="warning" bg="rgba(255, 193, 7, 0.1)" border="1px solid rgba(255, 193, 7, 0.3)" borderRadius="md" mb={4}>
+                    <AlertIcon />
+                    <AlertDescription color="white">
+                      You have {pendingDocuments.length} document(s) that require your electronic signature.
+                    </AlertDescription>
+                  </Alert>
+                  
+                  <List spacing={3}>
+                    {pendingDocuments.map((doc, index) => {
+                      const daysLeft = Math.ceil(
+                        (new Date(doc.expires_at).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
+                      );
+                      
+                      return (
+                        <ListItem key={doc.id}>
+                          <HStack justify="space-between" p={3} bg="rgba(255, 255, 255, 0.05)" borderRadius="md">
+                            <VStack align="start" spacing={1}>
+                              <Text color="white" fontWeight="semibold">
+                                {DOCUMENT_NAMES[doc.document_type as keyof typeof DOCUMENT_NAMES]}
+                              </Text>
+                              <Text fontSize="sm" color="gray.300">
+                                Expires in {daysLeft} days
+                              </Text>
+                              <Progress 
+                                value={Math.max(0, (daysLeft / 7) * 100)} 
+                                size="sm" 
+                                colorScheme={daysLeft > 3 ? "green" : daysLeft > 1 ? "yellow" : "red"}
+                                width="200px"
+                              />
+                            </VStack>
+                            <Button
+                              size="sm"
+                              colorScheme="blue"
+                              onClick={() => handleSignDocument(doc.document_type)}
+                            >
+                              Sign Now
+                            </Button>
+                          </HStack>
+                        </ListItem>
+                      );
+                    })}
+                  </List>
+                </CardBody>
+              </Card>
+            )}
           </VStack>
 
-          {/* Sidebar */}
+          {/* Sidebar with additional info */}
           <VStack spacing={6} align="stretch">
-            {/* Assignment Information */}
+            {/* Quick Stats */}
             <Card {...glassEffect}>
               <CardHeader>
-                <HStack>
-                  <InfoIcon color="purple.300" />
-                  <Heading size="md" color="white">Assignment</Heading>
-                </HStack>
+                <Heading size="sm" color="white">Quick Info</Heading>
               </CardHeader>
               <CardBody>
-                {asset.assigned_user_name ? (
-                  <VStack spacing={4}>
-                    <Avatar name={asset.assigned_user_name} size="lg" />
-                    <Text fontSize="lg" color="white" textAlign="center">
-                      {asset.assigned_user_name}
-                    </Text>
-                    <Text fontSize="sm" color="gray.300" textAlign="center">
-                      Currently assigned
-                    </Text>
-                  </VStack>
-                ) : (
-                  <VStack spacing={4}>
-                    <Avatar size="lg" />
-                    <Text fontSize="lg" color="gray.300" textAlign="center">
-                      Not assigned
-                    </Text>
-                    <Text fontSize="sm" color="gray.400" textAlign="center">
-                      Available for assignment
-                    </Text>
-                  </VStack>
-                )}
-              </CardBody>
-            </Card>
-
-            {/* Quick Actions */}
-            <Card {...glassEffect}>
-              <CardHeader>
-                <HStack>
-                  <SettingsIcon color="orange.300" />
-                  <Heading size="md" color="white">Quick Actions</Heading>
-                </HStack>
-              </CardHeader>
-              <CardBody>
-                <VStack spacing={3}>
-                  <Button
-                    width="100%"
-                    leftIcon={<TimeIcon />}
-                    variant="outline"
-                    colorScheme="blue"
-                    onClick={() => {/* TODO: View history */}}
-                  >
-                    View History
-                  </Button>
-                  <Button
-                    width="100%"
-                    leftIcon={<StarIcon />}
-                    variant="outline"
-                    colorScheme="green"
-                    onClick={() => {/* TODO: Generate QR */}}
-                  >
-                    Generate QR Code
-                  </Button>
-                  {asset.notes && (
-                    <Box w="100%" p={4} bg="rgba(255,255,255,0.1)" borderRadius="md">
-                      <Text fontSize="sm" color="gray.300" mb={2}>Notes:</Text>
-                      <Text fontSize="sm" color="white">{asset.notes}</Text>
-                    </Box>
-                  )}
+                <VStack spacing={4} align="stretch">
+                  <HStack justify="space-between">
+                    <Text color="gray.300">Asset ID</Text>
+                    <Text color="white" fontWeight="bold">{asset.asset_id}</Text>
+                  </HStack>
+                  <HStack justify="space-between">
+                    <Text color="gray.300">Status</Text>
+                    <Badge colorScheme={STATUS_COLORS[asset.status as keyof typeof STATUS_COLORS]}>
+                      {asset.status.replace('_', ' ')}
+                    </Badge>
+                  </HStack>
+                  <HStack justify="space-between">
+                    <Text color="gray.300">Created</Text>
+                    <Text color="white">{new Date(asset.created_at).toLocaleDateString()}</Text>
+                  </HStack>
+                  <HStack justify="space-between">
+                    <Text color="gray.300">Last Updated</Text>
+                    <Text color="white">{new Date(asset.updated_at).toLocaleDateString()}</Text>
+                  </HStack>
                 </VStack>
               </CardBody>
             </Card>
+
+            {/* Document Status Summary */}
+            {isAssignedToCurrentUser && (
+              <Card {...glassEffect}>
+                <CardHeader>
+                  <Heading size="sm" color="white">Document Status</Heading>
+                </CardHeader>
+                <CardBody>
+                  {loadingDocuments ? (
+                    <VStack spacing={2}>
+                      <Skeleton height="20px" />
+                      <Skeleton height="20px" />
+                      <Skeleton height="20px" />
+                    </VStack>
+                  ) : pendingDocuments.length > 0 ? (
+                    <VStack spacing={3} align="stretch">
+                      <Alert status="warning" size="sm" bg="rgba(255, 193, 7, 0.1)" border="1px solid rgba(255, 193, 7, 0.3)" borderRadius="md">
+                        <AlertIcon />
+                        <AlertDescription fontSize="sm" color="white">
+                          {pendingDocuments.length} pending signatures
+                        </AlertDescription>
+                      </Alert>
+                      <Button
+                        size="sm"
+                        colorScheme="blue"
+                        onClick={() => handleSignDocument(pendingDocuments[0].document_type)}
+                        width="100%"
+                      >
+                        Start Signing Process
+                      </Button>
+                    </VStack>
+                  ) : (
+                    <Alert status="success" size="sm" bg="rgba(72, 187, 120, 0.1)" border="1px solid rgba(72, 187, 120, 0.3)" borderRadius="md">
+                      <AlertIcon />
+                      <AlertDescription fontSize="sm" color="white">
+                        All documents signed
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </CardBody>
+              </Card>
+            )}
           </VStack>
         </Grid>
-      </Container>
 
-      {/* Issue Asset Modal */}
-      {/* {asset && (
-        <IssueAssetModal
-          isOpen={isIssueOpen}
-          onClose={onIssueClose}
-          asset={asset}
-        />
-      )} */}
+        {/* Issue Asset Modal */}
+        {asset && (
+          <IssueAssetModal
+            isOpen={isIssueOpen}
+            onClose={onIssueClose}
+            asset={asset}
+          />
+        )}
+
+        {/* Electronic Signature Modal */}
+        {asset && currentDocumentType && (
+          <ElectronicSignature
+            assetId={asset.id}
+            documentType={currentDocumentType}
+            onSigningComplete={handleSigningComplete}
+            isOpen={isSigningOpen}
+            onClose={onSigningClose}
+          />
+        )}
+      </Container>
     </Box>
   );
 };

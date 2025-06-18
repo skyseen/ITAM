@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 
 from app.core.config import settings
 from app.core.database import create_tables
-from app.routers import assets, users, auth
+from app.routers import assets, users, auth, documents
 
 
 @asynccontextmanager
@@ -41,6 +41,7 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(assets.router, prefix="/api/v1")
 app.include_router(users.router, prefix="/api/v1")
+app.include_router(documents.router, prefix="/api")
 
 @app.get("/")
 def read_root():

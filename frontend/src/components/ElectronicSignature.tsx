@@ -79,7 +79,11 @@ const ElectronicSignature: React.FC<ElectronicSignatureProps> = ({
 
   const fetchDocumentTemplate = async () => {
     try {
-      const response = await fetch(`/api/documents/templates/${documentType}`);
+      const response = await fetch(`http://localhost:8000/api/documents/templates/${documentType}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+        },
+      });
       if (response.ok) {
         const templateData = await response.json();
         setTemplate(templateData);
@@ -90,8 +94,17 @@ const ElectronicSignature: React.FC<ElectronicSignatureProps> = ({
           initialData[field.name] = field.value || '';
         });
         setFormData(initialData);
+      } else {
+        console.error('Failed to fetch template:', await response.text());
+        toast({
+          title: 'Error',
+          description: 'Failed to load document template',
+          status: 'error',
+          duration: 3000,
+        });
       }
     } catch (error) {
+      console.error('Error fetching template:', error);
       toast({
         title: 'Error',
         description: 'Failed to load document template',
@@ -156,11 +169,11 @@ const ElectronicSignature: React.FC<ElectronicSignatureProps> = ({
     try {
       const signatureData = signatureRef.current.toDataURL();
       
-      const response = await fetch('/api/documents/sign', {
+      const response = await fetch('http://localhost:8000/api/documents/sign', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
         },
         body: JSON.stringify({
           asset_id: assetId,

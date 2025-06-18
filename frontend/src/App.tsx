@@ -7,6 +7,7 @@ import { gradientBackgrounds } from './theme/futuristicTheme';
 import Navigation from './components/Navigation';
 import Login from './components/Login';
 import FuturisticDashboard from './components/Dashboard/FuturisticDashboard';
+import UserDashboard from './components/UserDashboard';
 import AssetList from './components/AssetList';
 import AssetForm from './components/AssetForm';
 import AssetDetail from './components/AssetDetail';
@@ -43,6 +44,25 @@ const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return <>{children}</>;
 };
 
+// Manager Route component (Admin or Manager access)
+const ManagerRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user, loading } = useAuth();
+  
+  if (loading) {
+    return <Box>Loading...</Box>;
+  }
+  
+  if (!user) {
+    return <Navigate to="/login" />;
+  }
+  
+  if (user.role !== 'admin' && user.role !== 'manager') {
+    return <Navigate to="/dashboard" />;
+  }
+  
+  return <>{children}</>;
+};
+
 const AppContent: React.FC = () => {
   const { user } = useAuth();
 
@@ -59,24 +79,27 @@ const AppContent: React.FC = () => {
             path="/dashboard"
             element={
               <ProtectedRoute>
-                <FuturisticDashboard />
+                {user?.role === 'admin' || user?.role === 'manager' ? 
+                  <FuturisticDashboard /> : 
+                  <UserDashboard />
+                }
               </ProtectedRoute>
             }
           />
           <Route
             path="/assets"
             element={
-              <ProtectedRoute>
+              <ManagerRoute>
                 <AssetList />
-              </ProtectedRoute>
+              </ManagerRoute>
             }
           />
           <Route
             path="/assets/:id"
             element={
-              <ProtectedRoute>
+              <ManagerRoute>
                 <AssetDetail />
-              </ProtectedRoute>
+              </ManagerRoute>
             }
           />
           <Route

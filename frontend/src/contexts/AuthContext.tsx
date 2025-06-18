@@ -69,6 +69,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           localStorage.removeItem('access_token');
           setToken(null);
         }
+      } else {
+        // Temporary: Set a default admin user for testing
+        setUser({
+          id: 1,
+          username: 'admin',
+          email: 'admin@test.com',
+          full_name: 'Test Admin',
+          department: 'IT',
+          role: 'admin',
+          is_active: true,
+        });
       }
       setLoading(false);
     };

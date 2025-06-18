@@ -6,8 +6,8 @@ This script creates the HTML templates and field schemas for the three Foxconn f
 
 import json
 from sqlalchemy.orm import Session
-from database import SessionLocal
-from models.asset import DocumentTemplate, DocumentType
+from .core.database import SessionLocal
+from .models.models import DocumentTemplate, DocumentType
 
 def create_declaration_form_template():
     """Create Declaration Form for Holding Company IT Asset template"""

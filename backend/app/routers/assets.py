@@ -43,7 +43,7 @@ import csv
 import io
 
 from app.core.database import get_db
-from app.models.models import Asset, AssetIssuance, AssetStatus, User, Notification
+from app.models.models import Asset, AssetIssuance, AssetStatus, User, Notification, AssetDocument, DocumentType, DocumentStatus
 from pydantic import BaseModel
 from typing import Dict, Any
 
@@ -391,6 +391,23 @@ def issue_asset(
     asset.assigned_user_id = issuance.user_id
     asset.department = user.department  # Update department to user's department
     asset.updated_at = datetime.utcnow()
+    
+    # Create pending documents for electronic signature
+    document_types = [
+        DocumentType.DECLARATION_FORM,
+        DocumentType.IT_ORIENTATION,
+        DocumentType.HANDOVER_FORM
+    ]
+    
+    for doc_type in document_types:
+        document = AssetDocument(
+            asset_id=asset_id,
+            user_id=issuance.user_id,
+            document_type=doc_type,
+            status=DocumentStatus.PENDING,
+            expires_at=datetime.utcnow() + timedelta(days=7)  # 7 days to sign
+        )
+        db.add(document)
     
     db.commit()
     db.refresh(db_issuance)

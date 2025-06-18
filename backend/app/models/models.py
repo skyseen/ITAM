@@ -290,4 +290,71 @@ class AuditLog(Base):
                       doc="Exact timestamp when the action was performed")
 
     # Relationships
-    user = relationship("User", doc="User who performed the action") 
+    user = relationship("User", doc="User who performed the action")
+
+
+class DocumentType(enum.Enum):
+    """Document types for electronic signature workflow"""
+    DECLARATION_FORM = "declaration_form"  # P14-Form 2
+    IT_ORIENTATION = "it_orientation"      # P14-Form 3  
+    HANDOVER_FORM = "handover_form"        # P14-Form 1
+
+
+class DocumentStatus(enum.Enum):
+    """Document signing status"""
+    PENDING = "pending"
+    SIGNED = "signed"
+    EXPIRED = "expired"
+    CANCELLED = "cancelled"
+
+
+class AssetDocument(Base):
+    """
+    Asset document model for electronic signature workflow.
+    
+    This model tracks documents that need to be signed when assets are issued,
+    including declaration forms, IT orientation forms, and handover forms.
+    """
+    __tablename__ = "asset_documents"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    asset_id = Column(Integer, ForeignKey("assets.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    document_type = Column(SQLEnum(DocumentType), nullable=False)
+    status = Column(SQLEnum(DocumentStatus), default=DocumentStatus.PENDING)
+    
+    # Document content and metadata
+    document_data = Column(Text)  # JSON data for form fields
+    signature_data = Column(Text)  # Base64 encoded signature
+    ip_address = Column(String(45))
+    user_agent = Column(String(500))
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow)
+    signed_at = Column(DateTime)
+    expires_at = Column(DateTime)
+    
+    # Relationships
+    asset = relationship("Asset")
+    user = relationship("User")
+
+
+class DocumentTemplate(Base):
+    """
+    Document template model for electronic signature forms.
+    
+    This model stores the HTML templates and field schemas for the various
+    forms that need to be signed during asset issuance.
+    """
+    __tablename__ = "document_templates"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    document_type = Column(SQLEnum(DocumentType), unique=True, nullable=False)
+    template_name = Column(String(200), nullable=False)
+    template_content = Column(Text, nullable=False)  # HTML template
+    fields_schema = Column(Text, nullable=False)     # JSON schema for form fields
+    is_active = Column(Boolean, default=True)
+    version = Column(String(10), default="1.0")
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

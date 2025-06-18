@@ -5,11 +5,9 @@ from datetime import datetime, timedelta
 import json
 import base64
 
-from ..database import get_db
-from ..models.asset import AssetDocument, DocumentTemplate, DocumentType, DocumentStatus
-from ..models.user import User
-from ..models.asset import Asset
-from ..auth import get_current_user
+from ..core.database import get_db
+from ..models.models import AssetDocument, DocumentTemplate, DocumentType, DocumentStatus, User, Asset
+from .auth import get_current_user
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/documents", tags=["documents"])
@@ -161,6 +159,37 @@ async def get_pending_documents(
             "created_at": doc.created_at,
             "expires_at": doc.expires_at
         } for doc in pending_docs
+    ]
+
+@router.get("/user/{user_id}")
+async def get_user_documents(
+    user_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get all documents for a specific user with template information"""
+    # Users can only see their own documents, admins/managers can see any
+    if current_user.id != user_id and current_user.role not in ["admin", "manager"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    documents = db.query(AssetDocument).filter(
+        AssetDocument.user_id == user_id
+    ).all()
+    
+    # Get template information for document names
+    templates = {t.document_type: t for t in db.query(DocumentTemplate).all()}
+    
+    return [
+        {
+            "id": doc.id,
+            "asset_id": doc.asset_id,
+            "document_type": doc.document_type.value,
+            "status": doc.status.value,
+            "created_at": doc.created_at,
+            "signed_at": doc.signed_at,
+            "expires_at": doc.expires_at,
+            "template_name": templates.get(doc.document_type, {}).template_name if templates.get(doc.document_type) else f"Document {doc.document_type.value}"
+        } for doc in documents
     ]
 
 @router.post("/initiate/{asset_id}")

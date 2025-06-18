@@ -31,15 +31,19 @@ import {
   Tooltip,
   SimpleGrid,
 } from '@chakra-ui/react';
-import {
-  FiTrendingUp,
-  FiShield,
-  FiUsers,
-  FiHardDrive,
-  FiActivity,
-  FiAlertCircle,
-} from 'react-icons/fi';
-import { ViewIcon, ArrowForwardIcon, InfoIcon, WarningIcon, TimeIcon } from '@chakra-ui/icons';
+// Using Chakra UI icons instead of react-icons for better compatibility
+import { 
+  ViewIcon, 
+  ArrowForwardIcon, 
+  InfoIcon, 
+  WarningIcon, 
+  TimeIcon,
+  SettingsIcon,
+  CheckCircleIcon,
+  AtSignIcon,
+  StarIcon,
+  BellIcon
+} from '@chakra-ui/icons';
 import { useAssets } from '../../contexts/AssetContext';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -377,7 +381,7 @@ const FuturisticDashboard: React.FC = () => {
               title="Total Assets"
               value={dashboardData.total_assets}
               subtitle="Across all departments"
-              icon={FiHardDrive}
+              icon={SettingsIcon}
               color="blue"
               onClick={() => navigate('/assets')}
               percentage={100}
@@ -387,7 +391,7 @@ const FuturisticDashboard: React.FC = () => {
               title="Available Assets"
               value={dashboardData.assets_by_status.available || 0}
               subtitle="Ready for assignment"
-              icon={FiShield}
+              icon={CheckCircleIcon}
               color="green"
               onClick={() => handleAssetFilter('available')}
               percentage={((dashboardData.assets_by_status.available || 0) / dashboardData.total_assets) * 100}
@@ -397,7 +401,7 @@ const FuturisticDashboard: React.FC = () => {
               title="Assets in Use"
               value={dashboardData.assets_by_status.in_use || 0}
               subtitle="Currently assigned"
-              icon={FiUsers}
+              icon={AtSignIcon}
               color="purple"
               onClick={() => handleAssetFilter('in_use')}
               percentage={((dashboardData.assets_by_status.in_use || 0) / dashboardData.total_assets) * 100}
@@ -407,7 +411,7 @@ const FuturisticDashboard: React.FC = () => {
               title="Scrapped Assets"
               value={scrappedAssets}
               subtitle="Retired from service"
-              icon={FiAlertCircle}
+              icon={WarningIcon}
               color="red"
               onClick={() => handleAssetFilter('retired')}
               percentage={((scrappedAssets) / dashboardData.total_assets) * 100}

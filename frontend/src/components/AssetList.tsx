@@ -94,6 +94,9 @@ import {
   componentPresets 
 } from '../theme/futuristicTheme';
 
+// Import IssueAssetModal for asset issuance functionality
+import IssueAssetModal from './IssueAssetModal';
+
 /**
  * Asset status color mapping for consistent visual indicators
  * Each status has a corresponding Chakra UI color scheme
@@ -280,7 +283,7 @@ const AssetRow: React.FC<AssetRowProps> = ({
             
             {/* Issue Asset - Available when asset is available */}
             {canIssue && (
-              <MenuItem onClick={() => onIssue(asset)}>
+              <MenuItem icon={<EditIcon />} onClick={() => onIssue(asset)}>
                 Issue to User
               </MenuItem>
             )}
@@ -378,6 +381,8 @@ const AssetList: React.FC = () => {
     fetchAssets(fetchParams);
   }, [fetchAssets, filters, pagination]);
 
+
+
   /**
    * Handle filter changes with debouncing for search input
    * Updates the filters state and resets pagination to first page
@@ -457,7 +462,6 @@ const AssetList: React.FC = () => {
   const prepareIssue = (asset: Asset) => {
     setSelectedAsset(asset);
     onIssueOpen();
-    // TODO: Implement issue dialog
   };
 
   /**
@@ -777,8 +781,14 @@ const AssetList: React.FC = () => {
         </AlertDialogOverlay>
       </AlertDialog>
 
-      {/* TODO: Add Issue Asset Modal */}
-      {/* TODO: Add Asset Details Modal */}
+      {/* Issue Asset Modal */}
+      {selectedAsset && (
+        <IssueAssetModal
+          isOpen={isIssueOpen}
+          onClose={onIssueClose}
+          asset={selectedAsset}
+        />
+      )}
       </Container>
     </Box>
   );

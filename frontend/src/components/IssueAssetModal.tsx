@@ -27,8 +27,16 @@ import {
   Avatar,
   Icon,
   useColorModeValue,
+  Input,
 } from '@chakra-ui/react';
-import { CalendarIcon, EditIcon } from '@chakra-ui/icons';
+import { 
+  CalendarIcon, 
+  EditIcon, 
+  ViewIcon, 
+  InfoIcon,
+  CheckIcon,
+  TimeIcon
+} from '@chakra-ui/icons';
 import { useAssets, Asset } from '../contexts/AssetContext';
 
 interface User {
@@ -154,7 +162,7 @@ const IssueAssetModal: React.FC<IssueAssetModalProps> = ({ isOpen, onClose, asse
       >
         <ModalHeader color="white">
           <HStack>
-                              <EditIcon color="blue.300" />
+            <EditIcon color="blue.300" />
             <Text>Issue Asset: {asset.asset_id}</Text>
           </HStack>
         </ModalHeader>
@@ -181,11 +189,44 @@ const IssueAssetModal: React.FC<IssueAssetModalProps> = ({ isOpen, onClose, asse
               </HStack>
             </Box>
 
+            {/* Document Signing Notice */}
+            <Box 
+              p={4} 
+              bg="rgba(59, 130, 246, 0.1)" 
+              borderRadius="12px"
+              border="1px solid rgba(59, 130, 246, 0.3)"
+            >
+              <HStack mb={3}>
+                <InfoIcon color="blue.300" />
+                <Text color="white" fontWeight="bold">Electronic Signature Required</Text>
+              </HStack>
+              <Text color="gray.200" fontSize="sm" mb={3}>
+                After issuance, the user will need to sign the following documents electronically:
+              </Text>
+              <VStack align="start" spacing={2} pl={4}>
+                <HStack>
+                  <Text color="blue.300" fontSize="sm">📝</Text>
+                  <Text color="gray.200" fontSize="sm">Declaration Form for Holding Company IT Asset</Text>
+                </HStack>
+                <HStack>
+                  <Text color="blue.300" fontSize="sm">🎓</Text>
+                  <Text color="gray.200" fontSize="sm">IT Orientation Acknowledgment Form</Text>
+                </HStack>
+                <HStack>
+                  <Text color="blue.300" fontSize="sm">📋</Text>
+                  <Text color="gray.200" fontSize="sm">Equipment Takeover/Handover Form</Text>
+                </HStack>
+              </VStack>
+              <Text color="yellow.300" fontSize="xs" mt={3}>
+                ⚠️ Documents must be signed within 7 days of issuance
+              </Text>
+            </Box>
+
             {/* User Selection */}
             <FormControl>
               <FormLabel color="white">
                 <HStack>
-                  <Icon as={FiUser} color="purple.300" />
+                  <ViewIcon color="purple.300" />
                   <Text>Select User</Text>
                 </HStack>
               </FormLabel>
@@ -198,31 +239,31 @@ const IssueAssetModal: React.FC<IssueAssetModalProps> = ({ isOpen, onClose, asse
                 color="white"
                 _placeholder={{ color: 'gray.400' }}
                 _hover={{ borderColor: 'rgba(255, 255, 255, 0.3)' }}
-                _focus={{ borderColor: 'blue.300', boxShadow: '0 0 0 1px #63b3ed' }}
-                disabled={loadingUsers}
+                _focus={{ borderColor: 'blue.300', boxShadow: '0 0 0 1px rgba(66, 153, 225, 0.6)' }}
               >
-                {users.map(user => (
-                  <option key={user.id} value={user.id} style={{ background: '#2D3748', color: 'white' }}>
+                {users.map((user) => (
+                  <option key={user.id} value={user.id.toString()}>
                     {user.full_name} - {user.department}
                   </option>
                 ))}
               </Select>
             </FormControl>
 
-            {/* Selected User Preview */}
+            {/* Selected User Info */}
             {selectedUser && (
               <Box 
                 p={4} 
-                bg="rgba(147, 51, 234, 0.1)" 
+                bg="rgba(66, 153, 225, 0.1)" 
                 borderRadius="12px"
-                border="1px solid rgba(147, 51, 234, 0.3)"
+                border="1px solid rgba(66, 153, 225, 0.2)"
               >
-                <HStack spacing={4}>
-                  <Avatar name={selectedUser.full_name} size="sm" />
+                <Text fontSize="sm" color="blue.300" mb={2}>Selected User</Text>
+                <HStack>
+                  <Avatar size="sm" name={selectedUser.full_name} />
                   <VStack align="start" spacing={0}>
                     <Text color="white" fontWeight="medium">{selectedUser.full_name}</Text>
-                    <Text color="gray.300" fontSize="sm">{selectedUser.department}</Text>
-                    <Text color="gray.400" fontSize="xs">{selectedUser.email}</Text>
+                    <Text color="gray.300" fontSize="sm">{selectedUser.email}</Text>
+                    <Badge colorScheme="blue" size="sm">{selectedUser.department}</Badge>
                   </VStack>
                 </HStack>
               </Box>
@@ -232,23 +273,19 @@ const IssueAssetModal: React.FC<IssueAssetModalProps> = ({ isOpen, onClose, asse
             <FormControl>
               <FormLabel color="white">
                 <HStack>
-                  <Icon as={FiCalendar} color="orange.300" />
+                  <CalendarIcon color="green.300" />
                   <Text>Expected Return Date (Optional)</Text>
                 </HStack>
               </FormLabel>
-              <input
+              <Input
                 type="date"
                 value={expectedReturnDate}
                 onChange={(e) => setExpectedReturnDate(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  borderRadius: '6px',
-                  color: 'white',
-                  fontSize: '16px',
-                }}
+                bg="rgba(255, 255, 255, 0.1)"
+                border="1px solid rgba(255, 255, 255, 0.2)"
+                color="white"
+                _hover={{ borderColor: 'rgba(255, 255, 255, 0.3)' }}
+                _focus={{ borderColor: 'green.300', boxShadow: '0 0 0 1px rgba(72, 187, 120, 0.6)' }}
               />
             </FormControl>
 
@@ -256,12 +293,12 @@ const IssueAssetModal: React.FC<IssueAssetModalProps> = ({ isOpen, onClose, asse
             <FormControl>
               <FormLabel color="white">
                 <HStack>
-                  <Icon as={FiFileText} color="green.300" />
+                  <InfoIcon color="orange.300" />
                   <Text>Notes (Optional)</Text>
                 </HStack>
               </FormLabel>
               <Textarea
-                placeholder="Any additional notes about this issuance..."
+                placeholder="Add any notes about this issuance..."
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 bg="rgba(255, 255, 255, 0.1)"
@@ -269,20 +306,25 @@ const IssueAssetModal: React.FC<IssueAssetModalProps> = ({ isOpen, onClose, asse
                 color="white"
                 _placeholder={{ color: 'gray.400' }}
                 _hover={{ borderColor: 'rgba(255, 255, 255, 0.3)' }}
-                _focus={{ borderColor: 'green.300', boxShadow: '0 0 0 1px #68d391' }}
-                rows={3}
+                _focus={{ borderColor: 'orange.300', boxShadow: '0 0 0 1px rgba(251, 211, 141, 0.6)' }}
+                resize="vertical"
+                minH="100px"
               />
             </FormControl>
           </VStack>
         </ModalBody>
 
         <ModalFooter>
-          <HStack spacing={4}>
+          <HStack spacing={3}>
             <Button
-              variant="ghost"
+              variant="outline"
               onClick={handleClose}
-              color="gray.300"
-              _hover={{ bg: 'rgba(255, 255, 255, 0.1)' }}
+              borderColor="rgba(255, 255, 255, 0.2)"
+              color="white"
+              _hover={{ 
+                bg: 'rgba(255, 255, 255, 0.1)',
+                borderColor: 'rgba(255, 255, 255, 0.3)'
+              }}
             >
               Cancel
             </Button>
@@ -291,13 +333,14 @@ const IssueAssetModal: React.FC<IssueAssetModalProps> = ({ isOpen, onClose, asse
               onClick={handleSubmit}
               isLoading={loading}
               loadingText="Issuing..."
-              bg="linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
-              _hover={{ 
-                bg: "linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%)",
-                transform: 'translateY(-2px)',
-                boxShadow: '0 4px 20px rgba(102, 126, 234, 0.4)'
+              leftIcon={<CheckIcon />}
+              bg="linear-gradient(135deg, rgba(66, 153, 225, 0.8) 0%, rgba(49, 130, 206, 0.8) 100%)"
+              _hover={{
+                bg: "linear-gradient(135deg, rgba(66, 153, 225, 1) 0%, rgba(49, 130, 206, 1) 100%)",
               }}
-              transition="all 0.2s"
+              _active={{
+                bg: "linear-gradient(135deg, rgba(49, 130, 206, 1) 0%, rgba(43, 108, 176, 1) 100%)",
+              }}
             >
               Issue Asset
             </Button>
