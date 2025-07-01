@@ -34,7 +34,7 @@ Version: 1.0.0
 Created: 2024
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Response, UploadFile, File
 from sqlalchemy.orm import Session
 from sqlalchemy import func, extract, and_, or_
 from typing import List, Optional
@@ -55,6 +55,7 @@ router = APIRouter(
 # Pydantic models
 class AssetBase(BaseModel):
     asset_id: str
+    asset_tag: Optional[str] = None
     type: str
     brand: str
     model: str
@@ -72,6 +73,7 @@ class AssetCreate(AssetBase):
 
 class AssetUpdate(BaseModel):
     asset_id: Optional[str] = None
+    asset_tag: Optional[str] = None
     type: Optional[str] = None
     brand: Optional[str] = None
     model: Optional[str] = None
@@ -127,27 +129,31 @@ class DashboardData(BaseModel):
 # Dashboard endpoint
 @router.get("/dashboard", response_model=DashboardData)
 def get_dashboard_data(db: Session = Depends(get_db)):
-    """Get comprehensive dashboard data"""
+    """Get comprehensive dashboard data for all assets including servers and network appliances"""
     
-    # Total assets
-    total_assets = db.query(Asset).count()
+    # User assets that can be issued out
+    user_asset_types = ['laptop', 'desktop', 'tablet']
+    user_assets_filter = Asset.type.in_(user_asset_types)
     
-    # Assets by status
+    # Total user assets only (for status chart)
+    total_assets = db.query(Asset).filter(user_assets_filter).count()
+    
+    # Assets by status (user assets only for the status chart)
     status_counts = db.query(
         Asset.status, func.count(Asset.id)
-    ).group_by(Asset.status).all()
+    ).filter(user_assets_filter).group_by(Asset.status).all()
     assets_by_status = {status.value: count for status, count in status_counts}
     
-    # Assets by type
+    # Assets by type (ALL asset types including servers and network appliances)
     type_counts = db.query(
         Asset.type, func.count(Asset.id)
     ).group_by(Asset.type).all()
-    assets_by_type = {asset_type: count for asset_type, count in type_counts}
+    assets_by_type = {asset_type.upper(): count for asset_type, count in type_counts}
     
-    # Assets by department
+    # Assets by department (user assets only)
     dept_counts = db.query(
         Asset.department, func.count(Asset.id)
-    ).group_by(Asset.department).all()
+    ).filter(user_assets_filter).group_by(Asset.department).all()
     assets_by_department = {dept: count for dept, count in dept_counts}
     
     # Recent issuances (last 10)
@@ -261,7 +267,10 @@ def get_assets(
     if department and department.strip():
         query = query.filter(Asset.department == department.strip())
     if asset_type and asset_type.strip():
-        query = query.filter(Asset.type == asset_type.strip())
+        # Handle multiple asset types separated by commas
+        asset_types = [t.strip() for t in asset_type.split(',') if t.strip()]
+        if asset_types:
+            query = query.filter(Asset.type.in_(asset_types))
     if search and search.strip():
         search_term = f"%{search.strip()}%"
         query = query.filter(
@@ -544,16 +553,16 @@ def export_assets_csv(
 # Get asset history
 @router.get("/{asset_id}/history", response_model=List[AssetIssuanceResponse])
 def get_asset_history(asset_id: int, db: Session = Depends(get_db)):
-    """Get issuance history for an asset"""
+    """Get asset issuance history"""
     asset = db.query(Asset).filter(Asset.id == asset_id).first()
     if asset is None:
         raise HTTPException(status_code=404, detail="Asset not found")
     
     issuances = db.query(AssetIssuance, User.full_name).join(
         User, AssetIssuance.user_id == User.id
-    ).filter(
-        AssetIssuance.asset_id == asset_id
-    ).order_by(AssetIssuance.issued_date.desc()).all()
+    ).filter(AssetIssuance.asset_id == asset_id).order_by(
+        AssetIssuance.issued_date.desc()
+    ).all()
     
     result = []
     for issuance, user_name in issuances:
@@ -569,4 +578,397 @@ def get_asset_history(asset_id: int, db: Session = Depends(get_db)):
             issued_by=issuance.issued_by
         ))
     
-    return result 
+    return result
+
+@router.post("/import/servers")
+def import_servers_csv(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """Import servers from CSV file"""
+    try:
+        # Validate file type
+        if not file.filename.endswith('.csv'):
+            raise HTTPException(status_code=400, detail="File must be a CSV file")
+        
+        # Read and parse CSV content
+        csv_content = file.file.read().decode('utf-8')
+        csv_reader = csv.DictReader(io.StringIO(csv_content))
+        
+        imported_count = 0
+        skipped_count = 0
+        errors = []
+        
+        for row_num, row in enumerate(csv_reader, start=2):  # Start at 2 because row 1 is headers
+            try:
+                # Skip empty rows
+                if not any(value.strip() for value in row.values() if value):
+                    continue
+                
+                # Check for duplicate serial number first
+                serial_number = row.get('Serial Number', '').strip() or None
+                if serial_number:
+                    existing_serial = db.query(Asset).filter(Asset.serial_number == serial_number).first()
+                    if existing_serial:
+                        errors.append(f"Row {row_num}: Serial number '{serial_number}' already exists in database")
+                        skipped_count += 1
+                        continue
+                
+                # Get base info for duplicate detection
+                brand = row.get('Brand', '').strip()
+                model = row.get('Model', '').strip()
+                server_name = row.get('Server Name', '').strip()
+                
+                # Check for potential duplicate based on server name in notes (more specific)
+                if server_name:
+                    notes_pattern = f"Server: {server_name}%"
+                    existing_similar = db.query(Asset).filter(
+                        Asset.type == "server",
+                        Asset.notes.like(notes_pattern)
+                    ).first()
+                    if existing_similar:
+                        errors.append(f"Row {row_num}: Server with name '{server_name}' already exists")
+                        skipped_count += 1
+                        continue
+                
+                # Generate unique asset_id for server
+                existing_ids = db.query(Asset.asset_id).filter(Asset.asset_id.like('SRV-%')).all()
+                existing_numbers = [int(aid[0].split('-')[1]) for aid in existing_ids if aid[0].split('-')[1].isdigit()]
+                next_number = max(existing_numbers) + 1 if existing_numbers else 1
+                asset_id = f"SRV-{next_number:03d}"
+                
+                # Double-check for asset_id uniqueness
+                while db.query(Asset).filter(Asset.asset_id == asset_id).first():
+                    next_number += 1
+                    asset_id = f"SRV-{next_number:03d}"
+                
+                # Parse purchase date
+                purchase_date_str = row.get('Purchase Date', '2024-01-01').strip()
+                try:
+                    purchase_date = datetime.strptime(purchase_date_str, '%Y-%m-%d')
+                except ValueError:
+                    try:
+                        purchase_date = datetime.strptime(purchase_date_str, '%m/%d/%Y')
+                    except ValueError:
+                        purchase_date = datetime.strptime('2024-01-01', '%Y-%m-%d')
+                
+                # Parse warranty expiry
+                warranty_expiry_str = row.get('Warranty Expiry', '2027-01-01').strip()
+                try:
+                    warranty_expiry = datetime.strptime(warranty_expiry_str, '%Y-%m-%d')
+                except ValueError:
+                    try:
+                        warranty_expiry = datetime.strptime(warranty_expiry_str, '%m/%d/%Y')
+                    except ValueError:
+                        warranty_expiry = datetime.strptime('2027-01-01', '%Y-%m-%d')
+                
+                # Create server asset
+                server_asset = Asset(
+                    asset_id=asset_id,
+                    type="server",
+                    brand=brand,
+                    model=model,
+                    serial_number=serial_number,
+                    department=row.get('Department', 'IT').strip(),
+                    location=row.get('Location', '').strip(),
+                    purchase_date=purchase_date,
+                    warranty_expiry=warranty_expiry,
+                    purchase_cost=row.get('Purchase Cost', '').strip() or None,
+                    condition=row.get('Condition', 'Good').strip(),
+                    notes=f"Server: {server_name} | OS: {row.get('OS', '')} {row.get('OS Version', '')} | Description: {row.get('Server Description', '')} | Remark: {row.get('Remark', '')}".strip(),
+                    status=AssetStatus.AVAILABLE
+                )
+                
+                db.add(server_asset)
+                db.flush()  # Flush to get any DB errors early
+                imported_count += 1
+                
+            except Exception as e:
+                errors.append(f"Row {row_num}: {str(e)}")
+                continue
+        
+        if imported_count > 0:
+            db.commit()
+        else:
+            db.rollback()
+        
+        return {
+            "message": f"Successfully imported {imported_count} servers, skipped {skipped_count} duplicates",
+            "imported_count": imported_count,
+            "skipped_count": skipped_count,
+            "errors": errors
+        }
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Failed to import CSV: {str(e)}")
+
+@router.get("/list/servers", response_model=List[AssetResponse])
+def get_servers(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    status: Optional[str] = Query(None),
+    location: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """Get all server assets"""
+    query = db.query(Asset).filter(Asset.type == "server")
+    
+    # Apply filters
+    if status:
+        query = query.filter(Asset.status == status)
+    if location:
+        query = query.filter(Asset.location.ilike(f"%{location}%"))
+    if search:
+        query = query.filter(
+            or_(
+                Asset.asset_id.ilike(f"%{search}%"),
+                Asset.brand.ilike(f"%{search}%"),
+                Asset.model.ilike(f"%{search}%"),
+                Asset.notes.ilike(f"%{search}%"),
+                Asset.location.ilike(f"%{search}%")
+            )
+        )
+    
+    # Get servers with user information
+    servers = query.offset(skip).limit(limit).all()
+    
+    result = []
+    for server in servers:
+        server_response = AssetResponse.from_orm(server)
+        if server.assigned_user_id:
+            user = db.query(User).filter(User.id == server.assigned_user_id).first()
+            server_response.assigned_user_name = user.full_name if user else None
+        result.append(server_response)
+    
+    return result
+
+@router.get("/list/network-appliances", response_model=List[AssetResponse])
+def get_network_appliances(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    status: Optional[str] = Query(None),
+    appliance_type: Optional[str] = Query(None),
+    location: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """Get all network appliance assets (router, firewall, switch)"""
+    query = db.query(Asset).filter(Asset.type.in_(["router", "firewall", "switch"]))
+    
+    # Apply filters
+    if status:
+        query = query.filter(Asset.status == status)
+    if appliance_type:
+        query = query.filter(Asset.type == appliance_type)
+    if location:
+        query = query.filter(Asset.location.ilike(f"%{location}%"))
+    if search:
+        query = query.filter(
+            or_(
+                Asset.asset_id.ilike(f"%{search}%"),
+                Asset.brand.ilike(f"%{search}%"),
+                Asset.model.ilike(f"%{search}%"),
+                Asset.notes.ilike(f"%{search}%"),
+                Asset.location.ilike(f"%{search}%")
+            )
+        )
+    
+    # Get network appliances
+    appliances = query.offset(skip).limit(limit).all()
+    
+    result = []
+    for appliance in appliances:
+        appliance_response = AssetResponse.from_orm(appliance)
+        result.append(appliance_response)
+    
+    return result
+
+@router.delete("/network-appliances/all")
+def delete_all_network_appliances(db: Session = Depends(get_db)):
+    """Delete all network appliance assets (router, firewall, switch) - FOR TESTING ONLY"""
+    try:
+        # Delete all network appliances
+        deleted_count = db.query(Asset).filter(Asset.type.in_(["router", "firewall", "switch"])).delete()
+        db.commit()
+        
+        return {
+            "message": f"Successfully deleted {deleted_count} network appliances",
+            "deleted_count": deleted_count
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to delete network appliances: {str(e)}")
+
+@router.get("/import/network-appliances/template")
+def download_network_appliances_template():
+    """Download CSV template for network appliances import"""
+    template_content = """Type (Required),Network Appliance Description (Optional),Brand (Required),Model (Required),Serial Number (Optional),Asset Tag (Optional - Finance Assigned),Department (Required),Location (Optional),Purchase Date (Optional - YYYY-MM-DD),Warranty Expiry (Optional - YYYY-MM-DD),Purchase Cost (Optional),Condition (Optional),Asset Checked (Optional - Y/N),Remark (Optional)
+router,Main office internet gateway,Cisco,ISR 4431,CSC001ISR4431,,IT,Network Closet A,2024-01-10,2027-01-10,$1200,Excellent,Y,Primary internet connection
+firewall,Perimeter security appliance,Fortinet,FortiGate 60F,FTN002FG60F,FIN-2024-001,IT,Network Closet A,2024-01-15,2027-01-15,$800,Excellent,Y,Main security gateway
+switch,Core network switch,Cisco,Catalyst 9300,CSC003C9300,,IT,Network Closet B,,,,$2500,Excellent,N,48-port managed switch - warranty pending
+router,Branch office router,TP-Link,Archer AX6000,TPL004AX6000,FIN-2024-002,Marketing,Branch Office,2024-03-01,2026-03-01,$300,Good,Y,Branch connectivity
+switch,Access layer switch,Netgear,GS724T,NET005GS724T,,Engineering,Office Floor 3,2024-01-20,2027-01-20,$400,Good,N,24-port managed switch"""
+    
+    # Create response with CSV content
+    response = Response(content=template_content, media_type="text/csv")
+    response.headers["Content-Disposition"] = "attachment; filename=network_appliances_import_template.csv"
+    return response
+
+@router.post("/import/network-appliances")
+def import_network_appliances_csv(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """Import network appliances from CSV file"""
+    try:
+        # Validate file type
+        if not file.filename.endswith('.csv'):
+            raise HTTPException(status_code=400, detail="File must be a CSV file")
+        
+        # Read and parse CSV content
+        csv_content = file.file.read().decode('utf-8')
+        csv_reader = csv.DictReader(io.StringIO(csv_content))
+        
+        imported_count = 0
+        skipped_count = 0
+        errors = []
+        
+        for row_num, row in enumerate(csv_reader, start=2):  # Start at 2 because row 1 is headers
+            try:
+                # Skip empty rows
+                if not any(value.strip() for value in row.values() if value):
+                    continue
+                
+                # Determine appliance type
+                appliance_type = row.get('Type (Required)', 'router').lower().strip()
+                if appliance_type not in ['router', 'firewall', 'switch']:
+                    appliance_type = 'router'  # Default fallback
+                
+                # Get relevant fields for duplicate detection
+                asset_tag = row.get('Asset Tag (Optional - Finance Assigned)', '').strip() or None
+                serial_number = row.get('Serial Number (Optional)', '').strip() or None
+                brand = row.get('Brand (Required)', '').strip()
+                model = row.get('Model (Required)', '').strip()
+                appliance_description = row.get('Network Appliance Description (Optional)', '').strip()
+                location = row.get('Location (Optional)', '').strip()
+                
+                # PRIMARY DUPLICATE CHECK: Asset Tag (Finance Department's unique identifier)
+                if asset_tag:
+                    existing_asset_tag = db.query(Asset).filter(Asset.asset_tag == asset_tag).first()
+                    if existing_asset_tag:
+                        errors.append(f"Row {row_num}: Asset tag '{asset_tag}' already exists in database")
+                        skipped_count += 1
+                        continue
+                
+                # SECONDARY DUPLICATE CHECK: Serial number (for items without asset tags)
+                if serial_number:
+                    existing_serial = db.query(Asset).filter(Asset.serial_number == serial_number).first()
+                    if existing_serial:
+                        errors.append(f"Row {row_num}: Serial number '{serial_number}' already exists in database")
+                        skipped_count += 1
+                        continue
+                
+                # Generate unique asset_id based on type
+                prefix_map = {'router': 'RTR', 'firewall': 'FWL', 'switch': 'SWT'}
+                prefix = prefix_map[appliance_type]
+                
+                existing_ids = db.query(Asset.asset_id).filter(Asset.asset_id.like(f'{prefix}-%')).all()
+                existing_numbers = [int(aid[0].split('-')[1]) for aid in existing_ids if aid[0].split('-')[1].isdigit()]
+                next_number = max(existing_numbers) + 1 if existing_numbers else 1
+                asset_id = f"{prefix}-{next_number:03d}"
+                
+                # Double-check for asset_id uniqueness
+                while db.query(Asset).filter(Asset.asset_id == asset_id).first():
+                    next_number += 1
+                    asset_id = f"{prefix}-{next_number:03d}"
+                
+                # Parse purchase date (optional)
+                purchase_date_str = row.get('Purchase Date (Optional - YYYY-MM-DD)', '').strip()
+                purchase_date = None
+                if purchase_date_str:
+                    try:
+                        purchase_date = datetime.strptime(purchase_date_str, '%Y-%m-%d')
+                    except ValueError:
+                        try:
+                            purchase_date = datetime.strptime(purchase_date_str, '%m/%d/%Y')
+                        except ValueError:
+                            errors.append(f"Row {row_num}: Invalid purchase date format '{purchase_date_str}'. Use YYYY-MM-DD or MM/DD/YYYY")
+                            continue
+                
+                # Default purchase date if not provided
+                if not purchase_date:
+                    purchase_date = datetime.strptime('2024-01-01', '%Y-%m-%d')
+                
+                # Parse warranty expiry (optional)
+                warranty_expiry_str = row.get('Warranty Expiry (Optional - YYYY-MM-DD)', '').strip()
+                warranty_expiry = None
+                if warranty_expiry_str:
+                    try:
+                        warranty_expiry = datetime.strptime(warranty_expiry_str, '%Y-%m-%d')
+                    except ValueError:
+                        try:
+                            warranty_expiry = datetime.strptime(warranty_expiry_str, '%m/%d/%Y')
+                        except ValueError:
+                            errors.append(f"Row {row_num}: Invalid warranty expiry date format '{warranty_expiry_str}'. Use YYYY-MM-DD or MM/DD/YYYY")
+                            continue
+                
+                # Default warranty expiry if not provided (3 years from purchase date)
+                if not warranty_expiry:
+                    warranty_expiry = datetime(purchase_date.year + 3, purchase_date.month, purchase_date.day)
+                
+                # Parse asset checked (Y/N logic)
+                asset_checked_str = row.get('Asset Checked (Optional - Y/N)', '').strip().upper()
+                asset_checked = asset_checked_str == 'Y'
+                
+                # Build comprehensive notes including all metadata
+                notes_parts = [
+                    f"Network Appliance: {appliance_type.title()}",
+                    f"Description: {appliance_description}" if appliance_description else None,
+                    f"Asset Checked: {'Yes' if asset_checked else 'No'}",
+                    f"Remark: {row.get('Remark (Optional)', '')}" if row.get('Remark (Optional)', '').strip() else None
+                ]
+                notes = " | ".join(filter(None, notes_parts))
+                
+                # Create network appliance asset
+                appliance_asset = Asset(
+                    asset_id=asset_id,
+                    type=appliance_type,
+                    brand=brand,
+                    model=model,
+                    serial_number=serial_number,
+                    asset_tag=asset_tag,  # Finance department assigned tag
+                    department=row.get('Department (Required)', 'IT').strip(),
+                    location=location,
+                    purchase_date=purchase_date,
+                    warranty_expiry=warranty_expiry,
+                    purchase_cost=row.get('Purchase Cost (Optional)', '').strip() or None,
+                    condition=row.get('Condition (Optional)', 'Good').strip(),
+                    notes=notes,
+                    status=AssetStatus.AVAILABLE
+                )
+                
+                db.add(appliance_asset)
+                db.flush()  # Flush to get any DB errors early
+                imported_count += 1
+                
+            except Exception as e:
+                errors.append(f"Row {row_num}: {str(e)}")
+                continue
+        
+        if imported_count > 0:
+            db.commit()
+        else:
+            db.rollback()
+        
+        return {
+            "message": f"Successfully imported {imported_count} network appliances, skipped {skipped_count} duplicates",
+            "imported_count": imported_count,
+            "skipped_count": skipped_count,
+            "errors": errors
+        }
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Failed to import CSV: {str(e)}") 

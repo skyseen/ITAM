@@ -5,7 +5,7 @@
  * and visual data representations for better insights.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -20,121 +20,23 @@ import {
   VStack,
   HStack,
   Button,
-  Progress,
   CircularProgress,
   CircularProgressLabel,
-  Flex,
-  Icon,
   Avatar,
   useColorModeValue,
   Skeleton,
-  Tooltip,
   SimpleGrid,
 } from '@chakra-ui/react';
 // Using Chakra UI icons instead of react-icons for better compatibility
 import { 
   ViewIcon, 
-  ArrowForwardIcon, 
   InfoIcon, 
-  WarningIcon, 
-  TimeIcon,
-  SettingsIcon,
-  CheckCircleIcon,
-  AtSignIcon,
-  StarIcon,
-  BellIcon
+  TimeIcon
 } from '@chakra-ui/icons';
 import { useAssets } from '../../contexts/AssetContext';
 import { useAuth } from '../../contexts/AuthContext';
 
-/**
- * Interactive Stat Card Component
- */
-interface InteractiveStatCardProps {
-  title: string;
-  value: number | string;
-  subtitle?: string;
-  icon: any;
-  color: string;
-  onClick?: () => void;
-  percentage?: number;
-  trend?: 'up' | 'down' | 'neutral';
-}
 
-const InteractiveStatCard: React.FC<InteractiveStatCardProps> = ({
-  title,
-  value,
-  subtitle,
-  icon,
-  color,
-  onClick,
-  percentage,
-  trend = 'neutral'
-}) => {
-  const cardBg = useColorModeValue(
-    'rgba(255, 255, 255, 0.1)',
-    'rgba(45, 55, 72, 0.1)'
-  );
-  
-  const glassEffect = {
-    bg: cardBg,
-    backdropFilter: 'blur(10px)',
-    borderRadius: '20px',
-    border: '1px solid',
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)',
-    cursor: onClick ? 'pointer' : 'default',
-    transition: 'all 0.3s ease',
-    _hover: onClick ? {
-      transform: 'translateY(-5px)',
-      boxShadow: '0 12px 40px 0 rgba(31, 38, 135, 0.5)',
-      borderColor: `${color}.300`,
-    } : {},
-  };
-
-  return (
-    <Card {...glassEffect} onClick={onClick}>
-      <CardBody>
-        <HStack justify="space-between" mb={4}>
-          <VStack align="start" spacing={1}>
-            <Text fontSize="sm" color="gray.300">{title}</Text>
-            <Heading size="lg" color="white" fontWeight="bold">
-              {value}
-            </Heading>
-            {subtitle && (
-              <Text fontSize="xs" color="gray.400">{subtitle}</Text>
-            )}
-          </VStack>
-          <Box p={3} bg={`${color}.100`} borderRadius="full">
-            <Icon as={icon} w={6} h={6} color={`${color}.500`} />
-          </Box>
-        </HStack>
-        
-        {percentage !== undefined && (
-          <VStack align="stretch" spacing={2}>
-            <Progress 
-              value={percentage} 
-              colorScheme={color} 
-              size="sm" 
-              borderRadius="full"
-              bg="rgba(255,255,255,0.1)"
-            />
-            <HStack justify="space-between">
-              <Text fontSize="xs" color="gray.400">Progress</Text>
-              <Text fontSize="xs" color={`${color}.300`}>{percentage}%</Text>
-            </HStack>
-          </VStack>
-        )}
-        
-        {onClick && (
-          <Flex justify="flex-end" mt={2}>
-            <ArrowForwardIcon color="gray.400" />
-          </Flex>
-        )}
-      </CardBody>
-    </Card>
-  );
-};
 
 /**
  * Circular Progress Card for Asset Status
@@ -144,9 +46,10 @@ interface CircularStatCardProps {
   data: Record<string, number>;
   total: number;
   onClick?: (status: string) => void;
+  onTotalClick?: () => void;
 }
 
-const CircularStatCard: React.FC<CircularStatCardProps> = ({ title, data, total, onClick }) => {
+const CircularStatCard: React.FC<CircularStatCardProps> = ({ title, data, total, onClick, onTotalClick }) => {
   const cardBg = useColorModeValue(
     'rgba(255, 255, 255, 0.1)',
     'rgba(45, 55, 72, 0.1)'
@@ -161,14 +64,16 @@ const CircularStatCard: React.FC<CircularStatCardProps> = ({ title, data, total,
     boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)',
   };
 
-  const statusColors = {
-    available: 'green',
-    in_use: 'blue',
-    maintenance: 'orange',
-    retired: 'gray',
-  };
+  // Define all possible asset statuses with their display names and colors
+  const allStatuses = [
+    { key: 'total', label: 'Total Assets', color: 'purple', value: total },
+    { key: 'available', label: 'Available', color: 'green', value: data.available || 0 },
+    { key: 'in_use', label: 'In Use', color: 'blue', value: data.in_use || 0 },
+    { key: 'maintenance', label: 'Maintenance', color: 'orange', value: data.maintenance || 0 },
+    { key: 'retired', label: 'Scrapped', color: 'gray', value: data.retired || 0 },
+  ];
 
-  const getPercentage = (value: number) => (value / total) * 100;
+  const getPercentage = (value: number) => total > 0 ? (value / total) * 100 : 0;
 
   return (
     <Card {...glassEffect}>
@@ -192,38 +97,56 @@ const CircularStatCard: React.FC<CircularStatCardProps> = ({ title, data, total,
                 {total}
               </CircularProgressLabel>
             </CircularProgress>
+            <Text color="gray.300" fontSize="xs" textAlign="center" mt={2}>
+              Total Assets
+            </Text>
           </Box>
           
           <VStack spacing={3} w="100%">
-            {Object.entries(data).map(([status, count]) => (
+            {allStatuses.map((status) => (
               <HStack
-                key={status}
+                key={status.key}
                 justify="space-between"
                 w="100%"
-                p={2}
+                p={3}
                 borderRadius="md"
                 bg="rgba(255,255,255,0.05)"
-                cursor={onClick ? "pointer" : "default"}
-                _hover={onClick ? { bg: "rgba(255,255,255,0.1)" } : {}}
-                onClick={() => onClick?.(status)}
+                cursor={onClick || (status.key === 'total' && onTotalClick) ? "pointer" : "default"}
+                _hover={onClick || (status.key === 'total' && onTotalClick) ? { bg: "rgba(255,255,255,0.1)" } : {}}
+                onClick={() => {
+                  if (status.key === 'total' && onTotalClick) {
+                    onTotalClick();
+                  } else if (status.key !== 'total' && onClick) {
+                    onClick(status.key);
+                  }
+                }}
+                transition="all 0.2s"
               >
                 <HStack>
                   <Box
                     w={3}
                     h={3}
                     borderRadius="full"
-                    bg={`${statusColors[status as keyof typeof statusColors] || 'gray'}.400`}
+                    bg={`${status.color}.400`}
                   />
-                  <Text color="gray.300" fontSize="sm" textTransform="capitalize">
-                    {status.replace('_', ' ')}
+                  <Text color="gray.300" fontSize="sm" fontWeight="medium">
+                    {status.label}
                   </Text>
                 </HStack>
-                <Badge 
-                  colorScheme={statusColors[status as keyof typeof statusColors] || 'gray'}
-                  variant="subtle"
-                >
-                  {count}
-                </Badge>
+                <VStack spacing={0} align="end">
+                  <Badge 
+                    colorScheme={status.color}
+                    variant="subtle"
+                    fontSize="sm"
+                  >
+                    {status.value}
+                  </Badge>
+                  {status.key !== 'total' && total > 0 && (
+                    <Text color="gray.400" fontSize="xs">
+                      {getPercentage(status.value).toFixed(1)}%
+                    </Text>
+                  )}
+                </VStack>
               </HStack>
             ))}
           </VStack>
@@ -336,12 +259,8 @@ const FuturisticDashboard: React.FC = () => {
         <Container maxW="8xl" py={8}>
           <VStack spacing={8}>
             <Skeleton height="100px" width="100%" borderRadius="20px" />
-            <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} spacing={6} w="100%">
-              {[...Array(4)].map((_, i) => (
-                <Skeleton key={i} height="150px" borderRadius="20px" />
-              ))}
-            </SimpleGrid>
-            <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={6} w="100%">
+            <SimpleGrid columns={{ base: 1, lg: 3 }} spacing={6} w="100%">
+              <Skeleton height="400px" borderRadius="20px" />
               <Skeleton height="400px" borderRadius="20px" />
               <Skeleton height="400px" borderRadius="20px" />
             </SimpleGrid>
@@ -359,7 +278,26 @@ const FuturisticDashboard: React.FC = () => {
     navigate(`/assets?${params.toString()}`);
   };
 
-  const scrappedAssets = dashboardData.assets_by_status.retired || 0;
+  const handleAssetTypeNavigation = (type: string) => {
+    const lowerType = type.toLowerCase().trim();
+    
+    // Navigate to specific pages for servers and network appliances
+    if (lowerType === 'server') {
+      // Server page only has servers, no filtering needed
+      navigate('/servers');
+    } else if (['router', 'firewall', 'switch'].includes(lowerType)) {
+      // Network appliances page with filter for specific type
+      navigate(`/network-appliances?type=${lowerType}`);
+    } else if (['desktop', 'laptop', 'tablet'].includes(lowerType)) {
+      // For user assets (laptop, desktop, tablet), go to assets page with filter
+      const params = new URLSearchParams();
+      params.set('asset_type', lowerType.toUpperCase());
+      navigate(`/assets?${params.toString()}`);
+    } else {
+      // Fallback to assets page for unknown types
+      navigate('/assets');
+    }
+  };
 
   return (
     <Box minH="100vh" bgGradient={bgGradient}>
@@ -375,57 +313,17 @@ const FuturisticDashboard: React.FC = () => {
             </Text>
           </VStack>
 
-          {/* Quick Stats Grid */}
-          <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} spacing={6}>
-            <InteractiveStatCard
-              title="Total Assets"
-              value={dashboardData.total_assets}
-              subtitle="Across all departments"
-              icon={SettingsIcon}
-              color="blue"
-              onClick={() => navigate('/assets')}
-              percentage={100}
-            />
-            
-            <InteractiveStatCard
-              title="Available Assets"
-              value={dashboardData.assets_by_status.available || 0}
-              subtitle="Ready for assignment"
-              icon={CheckCircleIcon}
-              color="green"
-              onClick={() => handleAssetFilter('available')}
-              percentage={((dashboardData.assets_by_status.available || 0) / dashboardData.total_assets) * 100}
-            />
-            
-            <InteractiveStatCard
-              title="Assets in Use"
-              value={dashboardData.assets_by_status.in_use || 0}
-              subtitle="Currently assigned"
-              icon={AtSignIcon}
-              color="purple"
-              onClick={() => handleAssetFilter('in_use')}
-              percentage={((dashboardData.assets_by_status.in_use || 0) / dashboardData.total_assets) * 100}
-            />
-            
-            <InteractiveStatCard
-              title="Scrapped Assets"
-              value={scrappedAssets}
-              subtitle="Retired from service"
-              icon={WarningIcon}
-              color="red"
-              onClick={() => handleAssetFilter('retired')}
-              percentage={((scrappedAssets) / dashboardData.total_assets) * 100}
-            />
-          </SimpleGrid>
+
 
           {/* Charts and Activity Section */}
           <Grid templateColumns={{ base: '1fr', lg: '1fr 1fr 1fr' }} gap={8}>
-            {/* Asset Status Distribution */}
+            {/* User Asset Status Distribution */}
             <CircularStatCard
-              title="Asset Status"
+              title="User Asset Status"
               data={dashboardData.assets_by_status}
               total={dashboardData.total_assets}
               onClick={(status) => handleAssetFilter(status)}
+              onTotalClick={() => navigate('/assets')}
             />
 
             {/* Asset Types Distribution */}
@@ -444,22 +342,40 @@ const FuturisticDashboard: React.FC = () => {
               </CardHeader>
               <CardBody>
                 <VStack spacing={4}>
-                  {Object.entries(dashboardData.assets_by_type).map(([type, count]) => (
-                    <HStack
-                      key={type}
-                      justify="space-between"
-                      w="100%"
-                      p={3}
-                      bg="rgba(255,255,255,0.05)"
-                      borderRadius="md"
-                      cursor="pointer"
-                      _hover={{ bg: "rgba(255,255,255,0.1)" }}
-                      onClick={() => handleAssetFilter(undefined, type)}
-                    >
-                      <Text color="gray.300">{type}</Text>
-                      <Badge colorScheme="teal">{count}</Badge>
-                    </HStack>
-                  ))}
+                  {(() => {
+                    // Define all asset types with their display labels
+                    const allAssetTypes = [
+                      { key: 'desktop', type: 'DESKTOP', label: 'DESKTOP (User Assets)' },
+                      { key: 'laptop', type: 'LAPTOP', label: 'LAPTOP (User Assets)' },
+                      { key: 'tablet', type: 'TABLET', label: 'TABLET (User Assets)' },
+                      { key: 'server', type: 'SERVER', label: 'SERVER' },
+                      { key: 'router', type: 'ROUTER', label: 'ROUTER' },
+                      { key: 'firewall', type: 'FIREWALL', label: 'FIREWALL' },
+                      { key: 'switch', type: 'SWITCH', label: 'SWITCH' }
+                    ];
+                    
+                    return allAssetTypes.map(({ key, type, label }) => {
+                      const count = dashboardData.assets_by_type[type] || 0;
+                      
+                      return (
+                        <HStack
+                          key={key}
+                          justify="space-between"
+                          w="100%"
+                          p={3}
+                          bg="rgba(255,255,255,0.05)"
+                          borderRadius="md"
+                          cursor="pointer"
+                          _hover={{ bg: "rgba(255,255,255,0.1)" }}
+                          onClick={() => handleAssetTypeNavigation(key)}
+                          transition="all 0.2s"
+                        >
+                          <Text color="gray.300" fontSize="sm">{label}</Text>
+                          <Badge colorScheme="teal">{count}</Badge>
+                        </HStack>
+                      );
+                    });
+                  })()}
                 </VStack>
               </CardBody>
             </Card>

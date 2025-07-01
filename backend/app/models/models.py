@@ -116,7 +116,9 @@ class Asset(Base):
     # Primary key and asset identification
     id = Column(Integer, primary_key=True, index=True, doc="Unique asset database ID")
     asset_id = Column(String(50), unique=True, index=True, nullable=False,
-                     doc="Human-readable asset identifier (e.g., LAP-001)")
+                     doc="System-generated asset identifier (e.g., LAP-001, RTR-002)")
+    asset_tag = Column(String(100), nullable=True, index=True,
+                      doc="Finance department assigned asset tag (e.g., FIN-2024-001, COMP-12345)")
     
     # Asset categorization and description
     type = Column(String(50), nullable=False, doc="Asset type (laptop, monitor, etc.)")

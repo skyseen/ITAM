@@ -166,31 +166,31 @@ def create_sample_assets(db):
             "condition": "Good"
         },
         
-        # Monitors
+        # Tablets
         {
-            "asset_id": "MON-001",
-            "type": "Monitor",
-            "brand": "Samsung",
-            "model": "27 Curved",
-            "serial_number": "SAM001C27",
+            "asset_id": "TAB-001",
+            "type": "tablet",
+            "brand": "Apple",
+            "model": "iPad Pro 12.9",
+            "serial_number": "APL001PRO129",
             "department": "Engineering",
             "location": "Office Floor 3",
             "purchase_date": datetime(2023, 2, 1),
             "warranty_expiry": datetime(2026, 2, 1),
-            "purchase_cost": "$350",
+            "purchase_cost": "$1,200",
             "condition": "Excellent"
         },
         {
-            "asset_id": "MON-002",
-            "type": "Monitor",
-            "brand": "LG",
-            "model": "UltraWide 34",
-            "serial_number": "LG002UW34",
+            "asset_id": "TAB-002",
+            "type": "tablet",
+            "brand": "Samsung",
+            "model": "Galaxy Tab S8",
+            "serial_number": "SAM002TABS8",
             "department": "Marketing",
             "location": "Office Floor 2",
             "purchase_date": datetime(2023, 4, 15),
             "warranty_expiry": datetime(2026, 4, 15),
-            "purchase_cost": "$450",
+            "purchase_cost": "$800",
             "condition": "Excellent"
         },
         
@@ -209,25 +209,25 @@ def create_sample_assets(db):
             "condition": "Good"
         },
         
-        # Printers
+        # Network Equipment (Switches)
         {
-            "asset_id": "PRT-001",
-            "type": "Printer",
-            "brand": "Canon",
-            "model": "ImageCLASS MF445dw",
-            "serial_number": "CAN001MF445",
-            "department": "General",
-            "location": "Office Floor 2 Common Area",
+            "asset_id": "SWT-001",
+            "type": "switch",
+            "brand": "Cisco",
+            "model": "Catalyst 9300",
+            "serial_number": "CSC001C9300",
+            "department": "IT",
+            "location": "Office Floor 2 Network Closet",
             "purchase_date": datetime(2023, 1, 5),
-            "warranty_expiry": datetime(2025, 1, 5),
-            "purchase_cost": "$300",
-            "condition": "Good"
+            "warranty_expiry": datetime(2026, 1, 5),
+            "purchase_cost": "$2,500",
+            "condition": "Excellent"
         },
         
-        # Network Equipment
+        # Network Equipment (Router)
         {
-            "asset_id": "NET-001",
-            "type": "Router",
+            "asset_id": "RTR-001",
+            "type": "router",
             "brand": "Cisco",
             "model": "ISR 4331",
             "serial_number": "CSC001ISR4331",
@@ -235,14 +235,29 @@ def create_sample_assets(db):
             "location": "Server Room",
             "purchase_date": datetime(2022, 6, 1),
             "warranty_expiry": datetime(2025, 6, 1),
-            "purchase_cost": "$1,200",
+            "purchase_cost": "$1,800",
             "condition": "Good"
+        },
+        
+        # Network Equipment (Firewall)
+        {
+            "asset_id": "FWL-001",
+            "type": "firewall",
+            "brand": "Fortinet",
+            "model": "FortiGate 60F",
+            "serial_number": "FTN001FG60F",
+            "department": "IT",
+            "location": "Server Room",
+            "purchase_date": datetime(2022, 8, 15),
+            "warranty_expiry": datetime(2025, 8, 15),
+            "purchase_cost": "$900",
+            "condition": "Excellent"
         },
         
         # Servers
         {
             "asset_id": "SRV-001",
-            "type": "Server",
+            "type": "server",
             "brand": "Dell",
             "model": "PowerEdge R740",
             "serial_number": "DLL001R740",
@@ -251,6 +266,19 @@ def create_sample_assets(db):
             "purchase_date": datetime(2022, 9, 15),
             "warranty_expiry": datetime(2025, 9, 15),
             "purchase_cost": "$3,500",
+            "condition": "Excellent"
+        },
+        {
+            "asset_id": "SRV-002",
+            "type": "server",
+            "brand": "HP",
+            "model": "ProLiant DL380",
+            "serial_number": "HP002DL380",
+            "department": "IT",
+            "location": "Server Room",
+            "purchase_date": datetime(2023, 1, 20),
+            "warranty_expiry": datetime(2026, 1, 20),
+            "purchase_cost": "$4,200",
             "condition": "Excellent"
         },
         
@@ -271,19 +299,19 @@ def create_sample_assets(db):
             "notes": "Screen replacement needed"
         },
         {
-            "asset_id": "MON-003",
-            "type": "Monitor",
-            "brand": "Dell",
-            "model": "UltraSharp 24",
-            "serial_number": "DLL003US24",
+            "asset_id": "TAB-003",
+            "type": "tablet",
+            "brand": "Microsoft",
+            "model": "Surface Pro 8",
+            "serial_number": "MSF003SP8",
             "department": "Finance",
             "location": "Storage",
             "purchase_date": datetime(2021, 3, 1),
             "warranty_expiry": datetime(2024, 3, 1),
-            "purchase_cost": "$200",
-            "condition": "Poor",
+            "purchase_cost": "$1,000",
+            "condition": "Good",
             "status": AssetStatus.RETIRED,
-            "notes": "End of life, replaced with newer model"
+            "notes": "Replaced with newer model"
         }
     ]
     
@@ -320,11 +348,11 @@ def create_sample_issuances(db, users, assets):
             "issued_by": "manager1"
         },
         {
-            "asset": next(a for a in assets if a.asset_id == "MON-001"),
-            "user": next(u for u in users if u.username == "user1"),
+            "asset": next(a for a in assets if a.asset_id == "TAB-001"),
+            "user": next(u for u in users if u.username == "user3"),
             "issued_date": datetime(2023, 6, 1),
             "expected_return_date": None,
-            "notes": "Secondary monitor for development",
+            "notes": "Tablet for mobile presentations",
             "issued_by": "admin"
         },
         {
@@ -377,8 +405,8 @@ def create_sample_notifications(db, users, assets):
         {
             "type": "warranty_expiry",
             "title": "Warranty Expiring Soon",
-            "message": "Asset MON-003 warranty expires in 15 days",
-            "asset": next(a for a in assets if a.asset_id == "MON-003"),
+            "message": "Asset RTR-001 warranty expires in 30 days",
+            "asset": next(a for a in assets if a.asset_id == "RTR-001"),
             "user": next(u for u in users if u.role == UserRole.ADMIN)
         },
         {

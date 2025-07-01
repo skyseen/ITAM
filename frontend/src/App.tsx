@@ -4,7 +4,7 @@ import { ChakraProvider, Box } from '@chakra-ui/react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { AssetProvider } from './contexts/AssetContext';
 import { gradientBackgrounds } from './theme/futuristicTheme';
-import Navigation from './components/Navigation';
+import Navbar from './components/Navbar';
 import Login from './components/Login';
 import FuturisticDashboard from './components/Dashboard/FuturisticDashboard';
 import UserDashboard from './components/UserDashboard';
@@ -13,6 +13,8 @@ import AssetForm from './components/AssetForm';
 import AssetDetail from './components/AssetDetail';
 import UserManagement from './components/UserManagement';
 import Profile from './components/Profile';
+import ServerManagement from './components/ServerManagement';
+import NetworkApplianceManagement from './components/NetworkApplianceManagement';
 
 // Protected Route component
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -71,7 +73,7 @@ const AppContent: React.FC = () => {
       minH="100vh" 
       bgGradient={user ? gradientBackgrounds.primary : 'gray.50'}
     >
-      {user && <Navigation />}
+      {user && <Navbar />}
       <Box p={user ? 0 : 0}>
         <Routes>
           <Route path="/login" element={user ? <Navigate to="/dashboard" /> : <Login />} />
@@ -116,6 +118,22 @@ const AppContent: React.FC = () => {
               <AdminRoute>
                 <AssetForm />
               </AdminRoute>
+            }
+          />
+          <Route
+            path="/servers"
+            element={
+              <ManagerRoute>
+                <ServerManagement />
+              </ManagerRoute>
+            }
+          />
+          <Route
+            path="/network-appliances"
+            element={
+              <ManagerRoute>
+                <NetworkApplianceManagement />
+              </ManagerRoute>
             }
           />
           <Route

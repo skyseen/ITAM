@@ -1,0 +1,6 @@
+Type (Required),Network Appliance Description (Optional),Brand (Required),Model (Required),Serial Number (Optional),Asset Tag (Optional - Finance Assigned),Department (Required),Location (Optional),Purchase Date (Optional - YYYY-MM-DD),Warranty Expiry (Optional - YYYY-MM-DD),Purchase Cost (Optional),Condition (Optional),Asset Checked (Optional - Y/N),Remark (Optional)
+router,Main office internet gateway,Cisco,ISR 4431,CSC001ISR4431,,IT,Network Closet A,2024-01-10,2027-01-10,$1200,Excellent,Y,Primary internet connection
+firewall,Perimeter security appliance,Fortinet,FortiGate 60F,FTN002FG60F,FIN-2024-001,IT,Network Closet A,2024-01-15,2027-01-15,$800,Excellent,Y,Main security gateway
+switch,Core network switch,Cisco,Catalyst 9300,CSC003C9300,,IT,Network Closet B,,,,$2500,Excellent,N,48-port managed switch - warranty pending
+router,Branch office router,TP-Link,Archer AX6000,TPL004AX6000,FIN-2024-002,Marketing,Branch Office,2024-03-01,2026-03-01,$300,Good,Y,Branch connectivity
+switch,Access layer switch,Netgear,GS724T,NET005GS724T,,Engineering,Office Floor 3,2024-01-20,2027-01-20,$400,Good,N,24-port managed switch 

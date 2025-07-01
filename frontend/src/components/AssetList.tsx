@@ -173,13 +173,25 @@ const AssetRow: React.FC<AssetRowProps> = ({
         transition: 'all 0.2s',
       }}
     >
-      {/* Asset ID - Primary identifier */}
+      {/* Asset ID - System-generated identifier */}
       <Td 
         fontWeight="semibold" 
         color="white"
         borderColor="rgba(255, 255, 255, 0.1)"
       >
         {asset.asset_id}
+      </Td>
+      
+      {/* Asset Tag - Finance department assigned tag */}
+      <Td 
+        color="gray.200"
+        borderColor="rgba(255, 255, 255, 0.1)"
+      >
+        {asset.asset_tag || (
+          <Text color="gray.400" fontSize="sm" fontStyle="italic">
+            Not assigned
+          </Text>
+        )}
       </Td>
       
       {/* Asset Type - Category classification */}
@@ -378,10 +390,16 @@ const AssetList: React.FC = () => {
       limit: pagination.limit,
       ...filters,
     };
+    
+    // If no specific asset type is selected, show all user asset types
+    // If a specific type is selected, use that filter
+    if (!filters.asset_type) {
+      // Show all user assets (laptop, desktop, tablet)
+      fetchParams.asset_type = 'laptop,desktop,tablet';
+    }
+    
     fetchAssets(fetchParams);
   }, [fetchAssets, filters, pagination]);
-
-
 
   /**
    * Handle filter changes with debouncing for search input
@@ -510,9 +528,14 @@ const AssetList: React.FC = () => {
         {/* Page Header */}
         <VStack spacing={6} align="stretch" mb={8}>
         <HStack justify="space-between" align="center">
-          <Heading size="lg" color="white" textShadow="0 2px 4px rgba(0, 0, 0, 0.3)">
-            Asset Inventory
-          </Heading>
+          <VStack align="start" spacing={1}>
+            <Heading size="lg" color="white" textShadow="0 2px 4px rgba(0, 0, 0, 0.3)">
+              User Assets Management
+            </Heading>
+            <Text color="gray.300" fontSize="sm">
+              Manage laptop, desktop, and tablet assets. For servers, visit "Servers" page. For network equipment, visit "Network" page.
+            </Text>
+          </VStack>
           <HStack spacing={4}>
             {/* Export Button */}
             <Button
@@ -530,7 +553,7 @@ const AssetList: React.FC = () => {
                 leftIcon={<AddIcon />}
                 colorScheme="blue"
                 size="md"
-                // TODO: Navigate to add asset form
+                onClick={() => navigate('/assets/new')}
               >
                 Add Asset
               </Button>
@@ -617,15 +640,9 @@ const AssetList: React.FC = () => {
                     boxShadow: '0 0 0 1px rgba(59, 130, 246, 0.5)',
                   }}
                 >
-                  <option value="Laptop" style={{ background: '#2D3748', color: 'white' }}>Laptop</option>
-                  <option value="Desktop" style={{ background: '#2D3748', color: 'white' }}>Desktop</option>
-                  <option value="Monitor" style={{ background: '#2D3748', color: 'white' }}>Monitor</option>
-                  <option value="Printer" style={{ background: '#2D3748', color: 'white' }}>Printer</option>
-                  <option value="Server" style={{ background: '#2D3748', color: 'white' }}>Server</option>
-                  <option value="Router" style={{ background: '#2D3748', color: 'white' }}>Router</option>
-                  <option value="Switch" style={{ background: '#2D3748', color: 'white' }}>Switch</option>
-                  <option value="Tablet" style={{ background: '#2D3748', color: 'white' }}>Tablet</option>
-                  <option value="Phone" style={{ background: '#2D3748', color: 'white' }}>Phone</option>
+                  <option value="laptop" style={{ background: '#2D3748', color: 'white' }}>Laptop</option>
+                  <option value="desktop" style={{ background: '#2D3748', color: 'white' }}>Desktop</option>
+                  <option value="tablet" style={{ background: '#2D3748', color: 'white' }}>Tablet</option>
                 </Select>
                 
                 {/* Department Filter */}
@@ -696,6 +713,7 @@ const AssetList: React.FC = () => {
               >
                 <Tr>
                   <Th color="white" fontWeight="bold" borderColor="rgba(255, 255, 255, 0.1)">Asset ID</Th>
+                  <Th color="white" fontWeight="bold" borderColor="rgba(255, 255, 255, 0.1)">Asset Tag</Th>
                   <Th color="white" fontWeight="bold" borderColor="rgba(255, 255, 255, 0.1)">Type</Th>
                   <Th color="white" fontWeight="bold" borderColor="rgba(255, 255, 255, 0.1)">Brand/Model</Th>
                   <Th color="white" fontWeight="bold" borderColor="rgba(255, 255, 255, 0.1)">Department</Th>

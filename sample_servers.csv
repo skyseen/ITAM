@@ -1,0 +1,5 @@
+Server Name,Server Description,Brand,Model,Serial Number,Department,Location,Purchase Date,Warranty Expiry,Purchase Cost,Condition,OS,OS Version,Remark
+Web Server 01,Primary web application server,Dell,PowerEdge R740,DLL001R740,IT,Data Center Rack A1,2024-01-15,2027-01-15,$3500,Excellent,Ubuntu Server,22.04 LTS,Production web server
+Database Server 01,Main database server,HP,ProLiant DL380,HP002DL380,IT,Data Center Rack A2,2024-02-01,2027-02-01,$4200,Excellent,CentOS,8.5,MySQL production database
+File Server 01,Network attached storage,Synology,DS920+,SYN003DS920,IT,Server Room B,2024-03-10,2027-03-10,$800,Good,DSM,7.1,File sharing and backup
+Development Server 01,Development and testing environment,Dell,PowerEdge R630,DLL004R630,Engineering,Office Floor 3,2023-12-01,2026-12-01,$2800,Good,Ubuntu Server,20.04 LTS,Dev environment for testing 

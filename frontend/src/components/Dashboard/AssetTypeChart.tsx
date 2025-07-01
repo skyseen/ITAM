@@ -22,11 +22,11 @@ ChartJS.register(
 
 // Mock data - Replace with actual API data
 const mockData = {
-  labels: ['Laptops', 'Desktops', 'Monitors', 'Printers', 'Servers', 'Network'],
+  labels: ['LAPTOP', 'DESKTOP', 'TABLET'],
   datasets: [
     {
-      label: 'Number of Assets',
-      data: [45, 30, 25, 15, 10, 20],
+      label: 'Number of User Assets',
+      data: [45, 30, 12],
       backgroundColor: 'rgba(54, 162, 235, 0.6)',
       borderColor: 'rgba(54, 162, 235, 1)',
       borderWidth: 1,

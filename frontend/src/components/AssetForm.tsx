@@ -81,13 +81,11 @@ import { useAuth } from '../contexts/AuthContext';
 const ASSET_TYPES = [
   { value: 'laptop', label: 'Laptop', description: 'Portable computers for mobile work' },
   { value: 'desktop', label: 'Desktop', description: 'Stationary workstation computers' },
-  { value: 'monitor', label: 'Monitor', description: 'Display screens and monitors' },
-  { value: 'printer', label: 'Printer', description: 'Printing and scanning devices' },
+  { value: 'tablet', label: 'Tablet', description: 'Tablet computers and mobile devices' },
   { value: 'server', label: 'Server', description: 'Server hardware and infrastructure' },
   { value: 'router', label: 'Router', description: 'Network routing equipment' },
-  { value: 'phone', label: 'Phone', description: 'Office phones and communication devices' },
-  { value: 'tablet', label: 'Tablet', description: 'Tablet computers and mobile devices' },
-  { value: 'other', label: 'Other', description: 'Other IT equipment not listed above' },
+  { value: 'firewall', label: 'Firewall', description: 'Network security appliances' },
+  { value: 'switch', label: 'Switch', description: 'Network switching equipment' },
 ];
 
 /**
@@ -250,6 +248,7 @@ const AssetForm: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<AssetFormData>({
     asset_id: '',
+    asset_tag: '',
     type: '',
     brand: '',
     model: '',
@@ -276,6 +275,7 @@ const AssetForm: React.FC = () => {
       if (asset) {
         setFormData({
           asset_id: asset.asset_id,
+          asset_tag: asset.asset_tag || '',
           type: asset.type,
           brand: asset.brand,
           model: asset.model,
@@ -341,6 +341,18 @@ const AssetForm: React.FC = () => {
    */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Check if asset type is allowed for this form
+    if (!['laptop', 'desktop', 'tablet'].includes(formData.type)) {
+      toast({
+        title: 'Invalid Asset Type',
+        description: 'Only laptop, desktop, and tablet assets can be created here. Use the specific management pages for servers and network appliances.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+      return;
+    }
     
     // Validate form data
     const validationErrors = validateForm(formData);
@@ -424,12 +436,12 @@ const AssetForm: React.FC = () => {
           <HStack justify="space-between" align="center">
             <VStack align="start" spacing={2}>
               <Heading size="lg" color="white" textShadow="0 2px 4px rgba(0, 0, 0, 0.3)">
-                {isEditing ? 'Edit Asset' : 'Add New Asset'}
+                {isEditing ? 'Edit User Asset' : 'Add New User Asset'}
               </Heading>
               <Text color="gray.200">
                 {isEditing 
-                  ? 'Update asset information and tracking details'
-                  : 'Enter details for the new IT asset to add to inventory'
+                  ? 'Update user asset information and tracking details'
+                  : 'Enter details for laptop, desktop, or tablet assets that will be issued to users'
                 }
               </Text>
             </VStack>
@@ -453,7 +465,7 @@ const AssetForm: React.FC = () => {
           >
             <AlertIcon color="cyan.300" />
             <Box>
-              <AlertTitle color="white" fontSize="lg" fontWeight="bold">📝 Form Guidelines</AlertTitle>
+              <AlertTitle color="white" fontSize="lg" fontWeight="bold">📝 User Asset Form Guidelines</AlertTitle>
               <AlertDescription color="gray.100" fontSize="md" lineHeight="1.6">
                 <Text mb={2}>
                   • Fields marked with <Text as="span" color="red.300" fontWeight="bold">*</Text> are required
@@ -461,8 +473,14 @@ const AssetForm: React.FC = () => {
                 <Text mb={2}>
                   • Asset ID will be auto-generated when you select the asset type
                 </Text>
+                <Text mb={2}>
+                  • This form is for <Text as="span" color="cyan.300" fontWeight="bold">Laptop, Desktop, and Tablet</Text> assets only
+                </Text>
+                <Text mb={2}>
+                  • For <Text as="span" color="orange.300" fontWeight="bold">Servers</Text>: Use the "Servers" page in navigation
+                </Text>
                 <Text>
-                  • Please ensure all information is accurate for proper tracking and reporting
+                  • For <Text as="span" color="green.300" fontWeight="bold">Network Equipment</Text>: Use the "Network" page in navigation
                 </Text>
               </AlertDescription>
             </Box>
@@ -498,24 +516,48 @@ const AssetForm: React.FC = () => {
                   <GridItem>
                     <FormControl isInvalid={Boolean(errors.asset_id)} isRequired>
                       <FormLabel color="white" fontWeight="medium">Asset ID</FormLabel>
-                                          <Input
-                      value={formData.asset_id}
-                      onChange={(e) => handleFieldChange('asset_id', e.target.value)}
-                      placeholder="e.g., LAP-001"
-                      isDisabled={isEditing} // Don't allow changing asset ID when editing
-                      bg="rgba(255, 255, 255, 0.1)"
-                      border="1px solid rgba(255, 255, 255, 0.2)"
-                      color="white"
-                      _placeholder={{ color: 'gray.400' }}
-                      _hover={{ borderColor: 'rgba(255, 255, 255, 0.3)' }}
-                      _focus={{ 
-                        borderColor: 'blue.300',
-                        boxShadow: '0 0 0 1px rgba(59, 130, 246, 0.5)',
-                      }}
-                    />
+                      <Input
+                        value={formData.asset_id}
+                        onChange={(e) => handleFieldChange('asset_id', e.target.value)}
+                        placeholder="e.g., LAP-001"
+                        isDisabled={isEditing} // Don't allow changing asset ID when editing
+                        bg="rgba(255, 255, 255, 0.1)"
+                        border="1px solid rgba(255, 255, 255, 0.2)"
+                        color="white"
+                        _placeholder={{ color: 'gray.400' }}
+                        _hover={{ borderColor: 'rgba(255, 255, 255, 0.3)' }}
+                        _focus={{ 
+                          borderColor: 'blue.300',
+                          boxShadow: '0 0 0 1px rgba(59, 130, 246, 0.5)',
+                        }}
+                      />
                       <FormErrorMessage>{errors.asset_id}</FormErrorMessage>
                       <FormHelperText color="gray.300">
-                        Unique identifier for this asset. Auto-generated when type is selected.
+                        System-generated unique identifier for this asset.
+                      </FormHelperText>
+                    </FormControl>
+                  </GridItem>
+
+                  {/* Asset Tag */}
+                  <GridItem>
+                    <FormControl>
+                      <FormLabel color="white" fontWeight="medium">Asset Tag</FormLabel>
+                      <Input
+                        value={formData.asset_tag || ''}
+                        onChange={(e) => handleFieldChange('asset_tag', e.target.value)}
+                        placeholder="e.g., FIN-2024-001, COMP-12345"
+                        bg="rgba(255, 255, 255, 0.1)"
+                        border="1px solid rgba(255, 255, 255, 0.2)"
+                        color="white"
+                        _placeholder={{ color: 'gray.400' }}
+                        _hover={{ borderColor: 'rgba(255, 255, 255, 0.3)' }}
+                        _focus={{ 
+                          borderColor: 'blue.300',
+                          boxShadow: '0 0 0 1px rgba(59, 130, 246, 0.5)',
+                        }}
+                      />
+                      <FormHelperText color="gray.300">
+                        Finance department assigned tag for asset tracking.
                       </FormHelperText>
                     </FormControl>
                   </GridItem>

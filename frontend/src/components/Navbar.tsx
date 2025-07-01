@@ -92,32 +92,43 @@ const Navbar: React.FC = () => {
           {/* Logo/Brand */}
           <HStack spacing={3}>
             <ViewIcon color="cyan.300" boxSize={8} />
-            <Text 
-              fontSize="2xl" 
-              fontWeight="bold" 
-              color="white"
-              textShadow="0 2px 4px rgba(0, 0, 0, 0.3)"
+            <Link
+              as={RouterLink}
+              to="/dashboard"
+              _hover={{ textDecoration: 'none', transform: 'scale(1.05)' }}
+              transition="all 0.3s ease"
             >
-              ITAM System
-            </Text>
+              <Text 
+                fontSize="2xl" 
+                fontWeight="bold" 
+                color="white"
+                textShadow="0 2px 4px rgba(0, 0, 0, 0.3)"
+                cursor="pointer"
+              >
+                ITAM System
+              </Text>
+            </Link>
           </HStack>
 
           <Spacer />
 
           {/* Navigation Links */}
           <HStack spacing={6}>
-            <NavLink to="/dashboard" icon={<TimeIcon />}>
-              Dashboard
-            </NavLink>
-            
             <NavLink to="/assets" icon={<SettingsIcon />}>
-              Assets
+              User Assets
             </NavLink>
 
-            {/* Add Asset Link - Only for Admin/Manager */}
+            {/* Server Management Link - Only for Admin/Manager */}
             {(user.role === 'admin' || user.role === 'manager') && (
-              <NavLink to="/assets/new" icon={<AddIcon />}>
-                Add Asset
+              <NavLink to="/servers" icon={<SettingsIcon />}>
+                Servers
+              </NavLink>
+            )}
+
+            {/* Network Appliances Link - Only for Admin/Manager */}
+            {(user.role === 'admin' || user.role === 'manager') && (
+              <NavLink to="/network-appliances" icon={<SettingsIcon />}>
+                Network
               </NavLink>
             )}
 

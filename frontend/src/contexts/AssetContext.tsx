@@ -27,6 +27,7 @@ import { api } from './AuthContext';
 export interface Asset {
   id: number;
   asset_id: string;
+  asset_tag?: string;
   type: string;
   brand: string;
   model: string;
@@ -47,6 +48,7 @@ export interface Asset {
 
 export interface AssetCreate {
   asset_id: string;
+  asset_tag?: string;
   type: string;
   brand: string;
   model: string;
