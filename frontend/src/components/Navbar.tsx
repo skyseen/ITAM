@@ -114,23 +114,105 @@ const Navbar: React.FC = () => {
 
           {/* Navigation Links */}
           <HStack spacing={6}>
-            <NavLink to="/assets" icon={<SettingsIcon />}>
-              User Assets
-            </NavLink>
-
-            {/* Server Management Link - Only for Admin/Manager */}
-            {(user.role === 'admin' || user.role === 'manager') && (
-              <NavLink to="/servers" icon={<SettingsIcon />}>
-                Servers
-              </NavLink>
-            )}
-
-            {/* Network Appliances Link - Only for Admin/Manager */}
-            {(user.role === 'admin' || user.role === 'manager') && (
-              <NavLink to="/network-appliances" icon={<SettingsIcon />}>
-                Network
-              </NavLink>
-            )}
+            {/* IT Assets Dropdown */}
+            <Menu>
+              <MenuButton
+                as={Button}
+                px={4}
+                py={2}
+                rounded="lg"
+                bg={["/assets", "/servers", "/network-appliances"].includes(location.pathname) ? 'rgba(59, 130, 246, 0.3)' : 'rgba(255, 255, 255, 0.1)'}
+                color="white"
+                border="1px solid"
+                borderColor={["/assets", "/servers", "/network-appliances"].includes(location.pathname) ? 'rgba(59, 130, 246, 0.5)' : 'rgba(255, 255, 255, 0.2)'}
+                backdropFilter="blur(10px)"
+                _hover={{
+                  bg: ["/assets", "/servers", "/network-appliances"].includes(location.pathname) ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255, 255, 255, 0.2)',
+                  borderColor: 'rgba(255, 255, 255, 0.4)',
+                  transform: 'translateY(-1px)',
+                  boxShadow: '0 4px 15px rgba(59, 130, 246, 0.3)',
+                }}
+                fontWeight={["/assets", "/servers", "/network-appliances"].includes(location.pathname) ? 'bold' : 'medium'}
+                leftIcon={<SettingsIcon />}
+                transition="all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
+                _active={{
+                  transform: 'translateY(0)',
+                }}
+              >
+                IT Assets
+              </MenuButton>
+              <MenuList
+                bg="rgba(26, 32, 44, 0.95)"
+                backdropFilter="blur(20px)"
+                border="1px solid rgba(255, 255, 255, 0.1)"
+                borderRadius="xl"
+                boxShadow="0 20px 40px rgba(0, 0, 0, 0.3)"
+                p={2}
+              >
+                <MenuItem
+                  as={RouterLink}
+                  to="/assets"
+                  color="white"
+                  fontWeight="medium"
+                  borderRadius="lg"
+                  bg={isActive("/assets") ? "rgba(59, 130, 246, 0.2)" : "transparent"}
+                  mb={1}
+                  _hover={{ 
+                    bg: 'rgba(59, 130, 246, 0.2)',
+                    color: 'cyan.200',
+                    transform: 'translateX(4px) scale(1.02)',
+                    boxShadow: '0 4px 15px rgba(59, 130, 246, 0.3)',
+                  }}
+                  transition="all 0.2s ease"
+                  icon={<ViewIcon />}
+                >
+                  📱 User Assets
+                </MenuItem>
+                
+                {(user.role === 'admin' || user.role === 'manager') && (
+                  <MenuItem
+                    as={RouterLink}
+                    to="/servers"
+                    color="white"
+                    fontWeight="medium"
+                    borderRadius="lg"
+                    bg={isActive("/servers") ? "rgba(59, 130, 246, 0.2)" : "transparent"}
+                    mb={1}
+                    _hover={{ 
+                      bg: 'rgba(59, 130, 246, 0.2)',
+                      color: 'cyan.200',
+                      transform: 'translateX(4px) scale(1.02)',
+                      boxShadow: '0 4px 15px rgba(59, 130, 246, 0.3)',
+                    }}
+                    transition="all 0.2s ease"
+                    icon={<SettingsIcon />}
+                  >
+                    🖥️ Servers
+                  </MenuItem>
+                )}
+                
+                {(user.role === 'admin' || user.role === 'manager') && (
+                  <MenuItem
+                    as={RouterLink}
+                    to="/network-appliances"
+                    color="white"
+                    fontWeight="medium"
+                    borderRadius="lg"
+                    bg={isActive("/network-appliances") ? "rgba(59, 130, 246, 0.2)" : "transparent"}
+                    _hover={{ 
+                      bg: 'rgba(59, 130, 246, 0.2)',
+                      color: 'cyan.200',
+                      transform: 'translateX(4px) scale(1.02)',
+                      boxShadow: '0 4px 15px rgba(59, 130, 246, 0.3)',
+                    }}
+                    transition="all 0.2s ease"
+                    icon={<ExternalLinkIcon />}
+                  >
+                    🌐 Network Appliances
+                  </MenuItem>
+                )}
+              </MenuList>
+            </Menu>
 
             {/* Users Link - Only for Admin */}
             {user.role === 'admin' && (

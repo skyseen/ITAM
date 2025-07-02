@@ -69,10 +69,10 @@ interface NetworkAppliance {
   network_appliance_type: 'router' | 'firewall' | 'switch';
   brand: string;
   model: string;
-  serial_number: string;
+  serial_number: string | null;
   asset_tag: string;
   location: string;
-  status: 'not_setup' | 'in_use' | 'maintenance' | 'eol';
+  status: 'available' | 'in_use' | 'maintenance' | 'retired';
   asset_checked: boolean;
   remark: string;
 }
@@ -85,7 +85,7 @@ interface NetworkApplianceFormData {
   serial_number: string;
   asset_tag: string;
   location: string;
-  status: 'not_setup' | 'in_use' | 'maintenance' | 'eol';
+  status: 'available' | 'in_use' | 'maintenance' | 'retired';
   asset_checked: boolean;
   remark: string;
 }
@@ -97,10 +97,10 @@ const APPLIANCE_TYPES = [
 ];
 
 const APPLIANCE_STATUSES = [
-  { value: 'not_setup', label: 'Not Yet Setup', color: 'gray' },
+  { value: 'available', label: 'Available', color: 'blue' },
   { value: 'in_use', label: 'In Use', color: 'green' },
   { value: 'maintenance', label: 'Maintenance', color: 'orange' },
-  { value: 'eol', label: 'EOL', color: 'red' },
+  { value: 'retired', label: 'Retired', color: 'red' },
 ];
 
 const NetworkApplianceManagement: React.FC = () => {
@@ -110,6 +110,7 @@ const NetworkApplianceManagement: React.FC = () => {
   
   const [appliances, setAppliances] = useState<NetworkAppliance[]>([]);
   const [filters, setFilters] = useState({ search: '', status: '', location: '', type: '' });
+  const [lastUpdatedId, setLastUpdatedId] = useState<number | null>(null);
   const { isOpen, onOpen, onClose } = useDisclosure();
   const { isOpen: isDeleteAllOpen, onOpen: onDeleteAllOpen, onClose: onDeleteAllClose } = useDisclosure();
   const [selectedAppliance, setSelectedAppliance] = useState<NetworkAppliance | null>(null);
@@ -121,12 +122,14 @@ const NetworkApplianceManagement: React.FC = () => {
     serial_number: '',
     asset_tag: '',
     location: '',
-    status: 'not_setup',
+    status: 'available',
     asset_checked: false,
     remark: '',
   });
   const [isImporting, setIsImporting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const { isOpen: isDeleteOpen, onOpen: onDeleteOpen, onClose: onDeleteClose } = useDisclosure();
+  const [applianceToDelete, setApplianceToDelete] = useState<NetworkAppliance | null>(null);
   const cancelRef = React.useRef<HTMLButtonElement>(null);
 
   // Fetch network appliances from API
@@ -153,14 +156,31 @@ const NetworkApplianceManagement: React.FC = () => {
             serial_number: asset.serial_number || '',
             asset_tag: asset.asset_tag || '', // Finance department assigned tag
             location: asset.location || '',
-            status: asset.status === 'AVAILABLE' ? 'not_setup' : 
-                   asset.status === 'IN_USE' ? 'in_use' :
-                   asset.status === 'MAINTENANCE' ? 'maintenance' : 'eol',
+            status: asset.status === 'available' ? 'available' : 
+                   asset.status === 'in_use' ? 'in_use' :
+                   asset.status === 'maintenance' ? 'maintenance' : 'retired',
             asset_checked: assetCheckedMatch ? assetCheckedMatch[1].trim() === 'Yes' : false,
             remark: remarkMatch ? remarkMatch[1].trim() : '',
           };
         });
-        setAppliances(transformedAppliances);
+        
+        // Sort appliances consistently by assigned_id to maintain order
+        const sortedAppliances = transformedAppliances.sort((a, b) => {
+          // If there's a recently updated item, prioritize it for visual feedback
+          if (lastUpdatedId) {
+            if (a.id === lastUpdatedId) return -1;
+            if (b.id === lastUpdatedId) return 1;
+          }
+          // Otherwise sort by assigned_id
+          return a.assigned_id.localeCompare(b.assigned_id);
+        });
+        
+        setAppliances(sortedAppliances);
+        
+        // Clear the last updated ID after a short delay to return to normal sorting
+        if (lastUpdatedId) {
+          setTimeout(() => setLastUpdatedId(null), 3000);
+        }
       }
     } catch (error) {
       console.error('Error fetching network appliances:', error);
@@ -213,7 +233,7 @@ const NetworkApplianceManagement: React.FC = () => {
       serial_number: '',
       asset_tag: '',
       location: '',
-      status: 'not_setup',
+      status: 'available',
       asset_checked: false,
       remark: '',
     });
@@ -221,30 +241,101 @@ const NetworkApplianceManagement: React.FC = () => {
     onOpen();
   };
 
-  const handleSubmit = () => {
-    if (selectedAppliance) {
-      // Update logic here
-      const updatedAppliances = appliances.map(a => 
-        a.id === selectedAppliance.id 
-          ? { ...a, ...formData }
-          : a
-      );
-      setAppliances(updatedAppliances);
-    } else {
-      // Add logic here
-      const newAppliance: NetworkAppliance = {
-        id: appliances.length + 1,
-        assigned_id: generateAssignedId(formData.network_appliance_type),
-        ...formData,
-      };
-      setAppliances([...appliances, newAppliance]);
+  const handleSubmit = async () => {
+    try {
+      if (selectedAppliance) {
+        // Update existing appliance
+        const updateData = {
+          type: formData.network_appliance_type,
+          brand: formData.brand,
+          model: formData.model,
+          serial_number: formData.serial_number || null,
+          asset_tag: formData.asset_tag,
+          department: 'IT',
+          location: formData.location,
+          condition: 'Good',
+          status: formData.status,
+          notes: `Description: ${formData.network_appliance_description} | Asset Checked: ${formData.asset_checked ? 'Yes' : 'No'} | Remark: ${formData.remark}`
+        };
+
+        const response = await fetch(`http://localhost:8000/api/v1/assets/${selectedAppliance.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(updateData),
+        });
+
+        if (response.ok) {
+          // Set the updated item ID to highlight it after refresh
+          setLastUpdatedId(selectedAppliance.id);
+          
+          toast({
+            title: 'Network Appliance Updated',
+            description: `${selectedAppliance.assigned_id} has been updated successfully.`,
+            status: 'success',
+            duration: 3000,
+            isClosable: true,
+          });
+          
+          // Refresh the appliance list
+          fetchAppliances();
+        } else {
+          const result = await response.json();
+          throw new Error(result.detail || 'Failed to update network appliance');
+        }
+      } else {
+        // Create new appliance
+        const createData = {
+          asset_id: generateAssignedId(formData.network_appliance_type),
+          type: formData.network_appliance_type,
+          brand: formData.brand,
+          model: formData.model,
+          serial_number: formData.serial_number || null,
+          asset_tag: formData.asset_tag,
+          department: 'IT',
+          location: formData.location,
+          purchase_date: new Date().toISOString(),
+          warranty_expiry: new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString(), // 3 years from now
+          condition: 'Good',
+          notes: `Description: ${formData.network_appliance_description} | Asset Checked: ${formData.asset_checked ? 'Yes' : 'No'} | Remark: ${formData.remark}`
+        };
+
+        const response = await fetch('http://localhost:8000/api/v1/assets/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(createData),
+        });
+
+        if (response.ok) {
+          toast({
+            title: 'Network Appliance Created',
+            description: `${createData.asset_id} has been created successfully.`,
+            status: 'success',
+            duration: 3000,
+            isClosable: true,
+          });
+          
+          // Refresh the appliance list
+          fetchAppliances();
+        } else {
+          const result = await response.json();
+          throw new Error(result.detail || 'Failed to create network appliance');
+        }
+      }
+      
+      onClose();
+    } catch (error: any) {
+      toast({
+        title: selectedAppliance ? 'Update Failed' : 'Creation Failed',
+        description: error.message || 'An error occurred while saving the network appliance',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
     }
-    onClose();
-    toast({
-      title: 'Network Appliance Saved',
-      status: 'success',
-      duration: 3000,
-    });
   };
 
   const filteredAppliances = appliances.filter(appliance => {
@@ -285,7 +376,7 @@ const NetworkApplianceManagement: React.FC = () => {
         appliance.network_appliance_type.charAt(0).toUpperCase() + appliance.network_appliance_type.slice(1),
         appliance.brand,
         appliance.model,
-        appliance.serial_number,
+        appliance.serial_number || '',
         appliance.asset_tag,
         appliance.location,
         APPLIANCE_STATUSES.find(s => s.value === appliance.status)?.label || appliance.status,
@@ -395,6 +486,51 @@ const NetworkApplianceManagement: React.FC = () => {
     }
   };
 
+  // Handle individual appliance deletion
+  const handleDelete = async (appliance: NetworkAppliance) => {
+    try {
+      const response = await fetch(`http://localhost:8000/api/v1/assets/${appliance.id}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        toast({
+          title: 'Appliance Deleted',
+          description: `Network appliance ${appliance.assigned_id} has been deleted successfully.`,
+          status: 'success',
+          duration: 3000,
+          isClosable: true,
+        });
+        
+        // Refresh the appliance list
+        fetchAppliances();
+      } else {
+        const result = await response.json();
+        toast({
+          title: 'Delete Failed',
+          description: result.detail || 'Failed to delete network appliance',
+          status: 'error',
+          duration: 5000,
+          isClosable: true,
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Delete Error',
+        description: 'Network error occurred during deletion',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    }
+  };
+
+  // Prepare individual delete action
+  const prepareDelete = (appliance: NetworkAppliance) => {
+    setApplianceToDelete(appliance);
+    onDeleteOpen();
+  };
+
   // Import CSV function
   const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -462,124 +598,168 @@ const NetworkApplianceManagement: React.FC = () => {
             <Heading size="lg" color="white">
               Network Appliance Management
             </Heading>
-            <Flex direction={{ base: 'column', md: 'row' }} gap={4} w="100%">
-              {/* Export Section */}
-              <HStack spacing={2}>
-                <Button
-                  leftIcon={<DownloadIcon />}
-                  variant="outline"
-                  size="md"
-                  color="white"
-                  borderColor="rgba(255, 255, 255, 0.3)"
-                  _hover={{
-                    borderColor: 'rgba(255, 255, 255, 0.5)',
-                    bg: 'rgba(255, 255, 255, 0.1)'
-                  }}
-                  onClick={handleExport}
-                >
-                  Export CSV
-                </Button>
-              </HStack>
-
+            {/* Improved Button Layout */}
+            <Flex direction={{ base: 'column', lg: 'row' }} gap={6} w="100%" align="start">
+              
               <Spacer />
 
-              {/* Import Section */}
+              {/* Main Action Buttons - Always Visible - Moved to Right */}
+              <VStack spacing={3} align="stretch" minW={{ base: "100%", lg: "300px" }}>
+                <Text color="white" fontSize="sm" fontWeight="bold" mb={1} textAlign="right">
+                  📋 Quick Actions
+                </Text>
+                <HStack spacing={3} justifyContent="flex-end" flexWrap="wrap">
+                  <Button 
+                    leftIcon={<AddIcon />} 
+                    colorScheme="blue" 
+                    size="md"
+                    onClick={handleAddAppliance}
+                    minW="140px"
+                    _hover={{
+                      transform: 'translateY(-1px)',
+                      boxShadow: 'lg'
+                    }}
+                    transition="all 0.2s"
+                  >
+                    Add New
+                  </Button>
+                  <Button
+                    leftIcon={<DownloadIcon />}
+                    variant="outline"
+                    size="md"
+                    color="white"
+                    borderColor="rgba(255, 255, 255, 0.4)"
+                    _hover={{
+                      borderColor: 'rgba(255, 255, 255, 0.7)',
+                      bg: 'rgba(255, 255, 255, 0.1)',
+                      transform: 'translateY(-1px)',
+                      boxShadow: 'lg'
+                    }}
+                    onClick={handleExport}
+                    minW="140px"
+                    transition="all 0.2s"
+                  >
+                    Export CSV
+                  </Button>
+                </HStack>
+              </VStack>
+
+              {/* Admin/Manager Functions */}
               {(user?.role === 'admin' || user?.role === 'manager') && (
-                <VStack spacing={2} align="stretch" minW="300px">
-                  <Text color="white" fontSize="sm" fontWeight="bold">
-                    Import Network Appliances
+                <VStack spacing={3} align="stretch" minW={{ base: "100%", lg: "350px" }}>
+                  <Text color="white" fontSize="sm" fontWeight="bold" mb={1} textAlign="right">
+                    🔧 Management Tools
                   </Text>
-                  <HStack spacing={2}>
-                    <Button
-                      leftIcon={<DownloadIcon />}
-                      variant="outline"
-                      size="sm"
-                      color="white"
-                      borderColor="rgba(255, 255, 255, 0.3)"
-                      _hover={{
-                        borderColor: 'rgba(255, 255, 255, 0.5)',
-                        bg: 'rgba(255, 255, 255, 0.1)'
-                      }}
-                      onClick={handleDownloadTemplate}
-                      flex="1"
-                    >
-                      Download Template
-                    </Button>
-                    
-                    <input
-                      type="file"
-                      accept=".csv"
-                      onChange={handleImport}
-                      style={{ display: 'none' }}
-                      id="appliance-csv-import"
-                    />
-                    <Button
-                      as="label"
-                      htmlFor="appliance-csv-import"
-                      leftIcon={<AttachmentIcon />}
-                      variant="outline"
-                      size="sm"
-                      color="white"
-                      borderColor="rgba(255, 255, 255, 0.3)"
-                      _hover={{
-                        borderColor: 'rgba(255, 255, 255, 0.5)',
-                        bg: 'rgba(255, 255, 255, 0.1)'
-                      }}
-                      isLoading={isImporting}
-                      loadingText="Importing..."
-                      cursor="pointer"
-                      flex="1"
-                    >
-                      Import CSV
-                    </Button>
-                  </HStack>
+                  
+                  {/* Import Section */}
+                  <Card bg="rgba(255, 255, 255, 0.05)" borderRadius="md" p={3}>
+                    <VStack spacing={3} align="stretch">
+                      <Text color="gray.300" fontSize="xs" fontWeight="medium">
+                        Import Network Appliances
+                      </Text>
+                      <HStack spacing={2}>
+                        <Button
+                          leftIcon={<DownloadIcon />}
+                          variant="outline"
+                          size="sm"
+                          color="white"
+                          borderColor="rgba(255, 255, 255, 0.3)"
+                          _hover={{
+                            borderColor: 'rgba(255, 255, 255, 0.5)',
+                            bg: 'rgba(255, 255, 255, 0.1)',
+                            transform: 'translateY(-1px)'
+                          }}
+                          onClick={handleDownloadTemplate}
+                          flex="1"
+                          transition="all 0.2s"
+                        >
+                          Template
+                        </Button>
+                        
+                        <input
+                          type="file"
+                          accept=".csv"
+                          onChange={handleImport}
+                          style={{ display: 'none' }}
+                          id="appliance-csv-import"
+                        />
+                        <Button
+                          as="label"
+                          htmlFor="appliance-csv-import"
+                          leftIcon={<AttachmentIcon />}
+                          colorScheme="green"
+                          variant="outline"
+                          size="sm"
+                          isLoading={isImporting}
+                          loadingText="Importing..."
+                          cursor="pointer"
+                          flex="1"
+                          _hover={{
+                            transform: 'translateY(-1px)',
+                            boxShadow: 'md'
+                          }}
+                          transition="all 0.2s"
+                        >
+                          Import CSV
+                        </Button>
+                      </HStack>
+                    </VStack>
+                  </Card>
                   
                   {/* Testing Section */}
-                  <Divider borderColor="rgba(255, 255, 255, 0.2)" />
-                  <Text color="orange.300" fontSize="xs" fontWeight="bold">
-                    Testing Functions
-                  </Text>
-                  <HStack spacing={2}>
-                    <Button
-                      leftIcon={<WarningIcon />}
-                      colorScheme="red"
-                      variant="outline"
-                      size="sm"
-                      onClick={onDeleteAllOpen}
-                      isLoading={isDeleting}
-                      loadingText="Deleting..."
-                      flex="1"
-                    >
-                      Delete All Records
-                    </Button>
-                    <Button 
-                      leftIcon={<AddIcon />} 
-                      colorScheme="blue" 
-                      size="sm"
-                      onClick={handleAddAppliance}
-                      flex="1"
-                    >
-                      Add Manual
-                    </Button>
-                  </HStack>
+                  <Card bg="rgba(255, 165, 0, 0.1)" borderRadius="md" p={3} borderColor="rgba(255, 165, 0, 0.3)" borderWidth="1px">
+                    <VStack spacing={3} align="stretch">
+                      <Text color="orange.300" fontSize="xs" fontWeight="bold">
+                        ⚠️ Testing Functions
+                      </Text>
+                      <Button
+                        leftIcon={<WarningIcon />}
+                        colorScheme="red"
+                        variant="outline"
+                        size="sm"
+                        onClick={onDeleteAllOpen}
+                        isLoading={isDeleting}
+                        loadingText="Deleting..."
+                        _hover={{
+                          transform: 'translateY(-1px)',
+                          boxShadow: 'md'
+                        }}
+                        transition="all 0.2s"
+                      >
+                        Delete All Records
+                      </Button>
+                    </VStack>
+                  </Card>
                 </VStack>
               )}
             </Flex>
           </HStack>
 
-          <Card bg="rgba(255, 255, 255, 0.1)" backdropFilter="blur(10px)">
-            <CardBody>
+                  <Card bg="rgba(255, 255, 255, 0.1)" backdropFilter="blur(10px)" borderRadius="xl" border="1px solid rgba(255, 255, 255, 0.1)">
+          <CardBody>
+            <VStack spacing={3} align="stretch">
+              <Text color="white" fontSize="sm" fontWeight="bold">
+                🔍 Search & Filter
+              </Text>
               <HStack spacing={4} w="100%" flexWrap="wrap">
                 <InputGroup flex="1" minW="250px">
                   <InputLeftElement>
                     <SearchIcon color="gray.400" />
                   </InputLeftElement>
                   <Input
-                    placeholder="Search network appliances..."
+                    placeholder="Search by ID, model, or asset tag..."
                     value={filters.search}
                     onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
                     bg="rgba(255, 255, 255, 0.1)"
                     color="white"
+                    borderColor="rgba(255, 255, 255, 0.2)"
+                    _hover={{
+                      borderColor: 'rgba(255, 255, 255, 0.3)'
+                    }}
+                    _focus={{
+                      borderColor: 'blue.400',
+                      boxShadow: '0 0 0 1px rgba(66, 153, 225, 0.6)'
+                    }}
                   />
                 </InputGroup>
                 
@@ -590,6 +770,13 @@ const NetworkApplianceManagement: React.FC = () => {
                   minW="150px"
                   bg="rgba(255, 255, 255, 0.1)"
                   color="white"
+                  borderColor="rgba(255, 255, 255, 0.2)"
+                  _hover={{
+                    borderColor: 'rgba(255, 255, 255, 0.3)'
+                  }}
+                  _focus={{
+                    borderColor: 'blue.400'
+                  }}
                 >
                   {APPLIANCE_TYPES.map(type => (
                     <option key={type.value} value={type.value} style={{ background: '#2D3748', color: 'white' }}>
@@ -605,6 +792,13 @@ const NetworkApplianceManagement: React.FC = () => {
                   minW="150px"
                   bg="rgba(255, 255, 255, 0.1)"
                   color="white"
+                  borderColor="rgba(255, 255, 255, 0.2)"
+                  _hover={{
+                    borderColor: 'rgba(255, 255, 255, 0.3)'
+                  }}
+                  _focus={{
+                    borderColor: 'blue.400'
+                  }}
                 >
                   {APPLIANCE_STATUSES.map(status => (
                     <option key={status.value} value={status.value} style={{ background: '#2D3748', color: 'white' }}>
@@ -613,13 +807,15 @@ const NetworkApplianceManagement: React.FC = () => {
                   ))}
                 </Select>
               </HStack>
-            </CardBody>
-          </Card>
+            </VStack>
+          </CardBody>
+        </Card>
         </VStack>
 
-        <Card bg="rgba(255, 255, 255, 0.1)" backdropFilter="blur(10px)">
+        <Card bg="rgba(255, 255, 255, 0.1)" backdropFilter="blur(10px)" borderRadius="xl" border="1px solid rgba(255, 255, 255, 0.1)">
           <CardBody p={0}>
-            <Table variant="simple">
+            <Box overflowX="auto">
+              <Table variant="simple">
               <Thead bg="rgba(255, 255, 255, 0.15)">
                 <Tr>
                   <Th color="white">Assigned ID</Th>
@@ -636,8 +832,24 @@ const NetworkApplianceManagement: React.FC = () => {
               </Thead>
               <Tbody>
                 {filteredAppliances.map((appliance) => (
-                  <Tr key={appliance.id}>
-                    <Td color="white">{appliance.assigned_id}</Td>
+                  <Tr 
+                    key={appliance.id}
+                    bg={appliance.id === lastUpdatedId ? 'rgba(66, 153, 225, 0.2)' : 'transparent'}
+                    _hover={{
+                      bg: appliance.id === lastUpdatedId ? 'rgba(66, 153, 225, 0.3)' : 'rgba(255, 255, 255, 0.05)'
+                    }}
+                    transition="all 0.3s"
+                  >
+                    <Td color="white">
+                      <HStack spacing={2}>
+                        <Text>{appliance.assigned_id}</Text>
+                        {appliance.id === lastUpdatedId && (
+                          <Badge colorScheme="blue" size="sm" fontSize="xs">
+                            ✨ Updated
+                          </Badge>
+                        )}
+                      </HStack>
+                    </Td>
                     <Td color="white">{appliance.network_appliance_description}</Td>
                     <Td color="white" textTransform="capitalize">{appliance.network_appliance_type}</Td>
                     <Td color="gray.200">{appliance.brand}</Td>
@@ -661,16 +873,27 @@ const NetworkApplianceManagement: React.FC = () => {
                       </Badge>
                     </Td>
                     <Td>
-                      <Menu>
-                        <MenuButton as={IconButton} icon={<HamburgerIcon />} variant="ghost" size="sm" />
-                        <MenuList bg="rgba(26, 32, 44, 0.95)">
-                          <MenuItem icon={<EditIcon />} onClick={() => {
+                      <HStack spacing={2}>
+                        <IconButton
+                          icon={<EditIcon />}
+                          size="sm"
+                          variant="solid"
+                          bg="white"
+                          color="gray.800"
+                          aria-label="Edit appliance"
+                          _hover={{
+                            bg: 'gray.100',
+                            transform: 'translateY(-1px)',
+                            boxShadow: 'md'
+                          }}
+                          transition="all 0.2s"
+                          onClick={() => {
                             setFormData({
                               network_appliance_description: appliance.network_appliance_description,
                               network_appliance_type: appliance.network_appliance_type,
                               brand: appliance.brand,
                               model: appliance.model,
-                              serial_number: appliance.serial_number,
+                              serial_number: appliance.serial_number || '',
                               asset_tag: appliance.asset_tag,
                               location: appliance.location,
                               status: appliance.status,
@@ -679,27 +902,50 @@ const NetworkApplianceManagement: React.FC = () => {
                             });
                             setSelectedAppliance(appliance);
                             onOpen();
-                          }}>
-                            Edit
-                          </MenuItem>
-                          <MenuItem icon={<DeleteIcon />} color="red.500">Delete</MenuItem>
-                        </MenuList>
-                      </Menu>
+                          }}
+                        />
+                        <IconButton
+                          icon={<DeleteIcon />}
+                          size="sm"
+                          variant="outline"
+                          colorScheme="red"
+                          aria-label="Delete appliance"
+                          _hover={{
+                            transform: 'translateY(-1px)',
+                            boxShadow: 'md'
+                          }}
+                          transition="all 0.2s"
+                          onClick={() => prepareDelete(appliance)}
+                        />
+                      </HStack>
                     </Td>
                   </Tr>
                 ))}
               </Tbody>
             </Table>
+            </Box>
           </CardBody>
         </Card>
 
         <Modal isOpen={isOpen} onClose={onClose} size="xl">
-          <ModalOverlay />
-          <ModalContent bg="rgba(26, 32, 44, 0.95)">
-            <ModalHeader color="white">
-              {selectedAppliance ? 'Edit' : 'Add'} Network Appliance
+          <ModalOverlay bg="rgba(0, 0, 0, 0.6)" backdropFilter="blur(4px)" />
+          <ModalContent bg="rgba(26, 32, 44, 0.95)" borderRadius="xl" border="1px solid rgba(255, 255, 255, 0.1)">
+            <ModalHeader 
+              color="white" 
+              bg="rgba(255, 255, 255, 0.05)" 
+              borderBottom="1px solid rgba(255, 255, 255, 0.1)"
+              borderTopRadius="xl"
+              fontSize="lg"
+              fontWeight="bold"
+            >
+              🌐 {selectedAppliance ? 'Edit' : 'Add New'} Network Appliance
             </ModalHeader>
-            <ModalCloseButton color="white" />
+            <ModalCloseButton 
+              color="white" 
+              _hover={{
+                bg: 'rgba(255, 255, 255, 0.1)'
+              }}
+            />
             <ModalBody>
               <VStack spacing={4}>
                 <FormControl>
@@ -782,7 +1028,7 @@ const NetworkApplianceManagement: React.FC = () => {
                   <FormLabel color="white">Status</FormLabel>
                   <Select
                     value={formData.status}
-                    onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value as 'not_setup' | 'in_use' | 'maintenance' | 'eol' }))}
+                    onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value as 'available' | 'in_use' | 'maintenance' | 'retired' }))}
                     bg="rgba(255, 255, 255, 0.1)"
                     color="white"
                   >
@@ -815,9 +1061,31 @@ const NetworkApplianceManagement: React.FC = () => {
                 </FormControl>
               </VStack>
             </ModalBody>
-            <ModalFooter>
-              <Button variant="ghost" mr={3} onClick={onClose}>Cancel</Button>
-              <Button colorScheme="blue" onClick={handleSubmit}>Save</Button>
+            <ModalFooter bg="rgba(255, 255, 255, 0.05)" borderTop="1px solid rgba(255, 255, 255, 0.1)">
+              <Button 
+                variant="outline" 
+                mr={3} 
+                onClick={onClose}
+                color="white"
+                borderColor="rgba(255, 255, 255, 0.3)"
+                _hover={{
+                  borderColor: 'rgba(255, 255, 255, 0.5)',
+                  bg: 'rgba(255, 255, 255, 0.1)'
+                }}
+              >
+                Cancel
+              </Button>
+              <Button 
+                colorScheme="blue" 
+                onClick={handleSubmit}
+                _hover={{
+                  transform: 'translateY(-1px)',
+                  boxShadow: 'lg'
+                }}
+                transition="all 0.2s"
+              >
+                {selectedAppliance ? 'Update' : 'Create'} Asset
+              </Button>
             </ModalFooter>
           </ModalContent>
         </Modal>
@@ -861,6 +1129,59 @@ const NetworkApplianceManagement: React.FC = () => {
                   loadingText="Deleting..."
                 >
                   Delete All
+                </Button>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialogOverlay>
+        </AlertDialog>
+
+        {/* Individual Delete Confirmation Dialog */}
+        <AlertDialog
+          isOpen={isDeleteOpen}
+          leastDestructiveRef={cancelRef}
+          onClose={onDeleteClose}
+        >
+          <AlertDialogOverlay>
+            <AlertDialogContent bg="rgba(26, 32, 44, 0.95)">
+              <AlertDialogHeader fontSize="lg" fontWeight="bold" color="white">
+                Delete Network Appliance
+              </AlertDialogHeader>
+
+              <AlertDialogBody color="white">
+                {applianceToDelete && (
+                  <VStack align="start" spacing={3}>
+                    <Text>
+                      Are you sure you want to delete <strong>{applianceToDelete.assigned_id}</strong>?
+                    </Text>
+                    <Text color="gray.300" fontSize="sm">
+                      <strong>Type:</strong> {applianceToDelete.network_appliance_type.charAt(0).toUpperCase() + applianceToDelete.network_appliance_type.slice(1)}
+                    </Text>
+                    <Text color="gray.300" fontSize="sm">
+                      <strong>Brand:</strong> {applianceToDelete.brand} {applianceToDelete.model}
+                    </Text>
+                    <Text color="red.300" fontSize="sm">
+                      This action cannot be undone.
+                    </Text>
+                  </VStack>
+                )}
+              </AlertDialogBody>
+
+              <AlertDialogFooter>
+                <Button ref={cancelRef} onClick={onDeleteClose}>
+                  Cancel
+                </Button>
+                <Button 
+                  colorScheme="red" 
+                  onClick={() => {
+                    if (applianceToDelete) {
+                      handleDelete(applianceToDelete);
+                      onDeleteClose();
+                      setApplianceToDelete(null);
+                    }
+                  }} 
+                  ml={3}
+                >
+                  Delete
                 </Button>
               </AlertDialogFooter>
             </AlertDialogContent>

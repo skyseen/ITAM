@@ -120,7 +120,7 @@ export const AssetProvider: React.FC<AssetProviderProps> = ({ children }) => {
 
   const createAsset = async (asset: AssetCreate) => {
     try {
-      await api.post('/assets', asset);
+      await api.post('/assets/', asset);
       await fetchAssets(); // Refresh the list
     } catch (error) {
       console.error('Failed to create asset:', error);

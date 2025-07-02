@@ -39,6 +39,12 @@ import {
   FormLabel,
   Textarea,
   Checkbox,
+  AlertDialog,
+  AlertDialogBody,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogContent,
+  AlertDialogOverlay,
 } from '@chakra-ui/react';
 import {
   SearchIcon,
@@ -59,7 +65,7 @@ interface Server {
   model: string;
   asset_tag: string;
   location: string;
-  status: 'not_setup' | 'in_use' | 'maintenance' | 'eol';
+  status: 'available' | 'in_use' | 'maintenance' | 'retired';
   os: string;
   os_version: string;
   asset_checked: boolean;
@@ -67,10 +73,10 @@ interface Server {
 }
 
 const SERVER_STATUSES = [
-  { value: 'not_setup', label: 'Not Yet Setup', color: 'gray' },
+  { value: 'available', label: 'Available', color: 'blue' },
   { value: 'in_use', label: 'In Use', color: 'green' },
   { value: 'maintenance', label: 'Maintenance', color: 'orange' },
-  { value: 'eol', label: 'EOL', color: 'red' },
+  { value: 'retired', label: 'Retired', color: 'red' },
 ];
 
 const ServerManagement: React.FC = () => {
@@ -80,14 +86,17 @@ const ServerManagement: React.FC = () => {
   const [servers, setServers] = useState<Server[]>([]);
   const [filters, setFilters] = useState({ search: '', status: '', location: '' });
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const { isOpen: isDeleteOpen, onOpen: onDeleteOpen, onClose: onDeleteClose } = useDisclosure();
   const [selectedServer, setSelectedServer] = useState<Server | null>(null);
+  const [serverToDelete, setServerToDelete] = useState<Server | null>(null);
+  const cancelRef = React.useRef<HTMLButtonElement>(null);
   const [formData, setFormData] = useState({
     server_description: '',
     server_name: '',
     model: '',
     asset_tag: '',
     location: '',
-    status: 'not_setup',
+    status: 'available',
     os: '',
     os_version: '',
     asset_checked: false,
@@ -117,9 +126,9 @@ const ServerManagement: React.FC = () => {
             model: asset.model,
             asset_tag: asset.asset_tag || '', // Finance department assigned tag
             location: asset.location || '',
-            status: asset.status === 'AVAILABLE' ? 'not_setup' : 
-                   asset.status === 'IN_USE' ? 'in_use' :
-                   asset.status === 'MAINTENANCE' ? 'maintenance' : 'eol',
+            status: asset.status === 'available' ? 'available' : 
+                   asset.status === 'in_use' ? 'in_use' :
+                   asset.status === 'maintenance' ? 'maintenance' : 'retired',
             os: osMatch ? osMatch[1].trim().split(' ')[0] : '',
             os_version: osMatch ? osMatch[1].trim().split(' ').slice(1).join(' ') : '',
             asset_checked: Math.random() > 0.5, // Random for now, you can add this field to backend
@@ -150,7 +159,7 @@ const ServerManagement: React.FC = () => {
       model: '',
       asset_tag: '',
       location: '',
-      status: 'not_setup',
+      status: 'available',
       os: '',
       os_version: '',
       asset_checked: false,
@@ -160,18 +169,150 @@ const ServerManagement: React.FC = () => {
     onOpen();
   };
 
-  const handleSubmit = () => {
-    if (selectedServer) {
-      // Update logic here
-    } else {
-      // Add logic here
+  const handleSubmit = async () => {
+    try {
+      if (selectedServer) {
+        // Update existing server
+        const updateData = {
+          type: 'server',
+          brand: formData.model.split(' ')[0] || 'Generic', // Extract brand from model
+          model: formData.model,
+          serial_number: formData.server_name || null, // Use server name as serial for uniqueness
+          asset_tag: formData.asset_tag,
+          department: 'IT',
+          location: formData.location,
+          condition: 'Good',
+          status: formData.status,
+          notes: `Server: ${formData.server_name} | OS: ${formData.os} ${formData.os_version} | Description: ${formData.server_description} | Remark: ${formData.remark}`
+        };
+
+        const response = await fetch(`http://localhost:8000/api/v1/assets/${selectedServer.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(updateData),
+        });
+
+        if (response.ok) {
+          toast({
+            title: 'Server Updated',
+            description: `${selectedServer.assigned_id} has been updated successfully.`,
+            status: 'success',
+            duration: 3000,
+            isClosable: true,
+          });
+          
+          // Refresh the server list
+          fetchServers();
+        } else {
+          const result = await response.json();
+          throw new Error(result.detail || 'Failed to update server');
+        }
+      } else {
+        // Generate unique server ID
+        const existingIds = servers
+          .filter(s => s.assigned_id.startsWith('SRV-'))
+          .map(s => parseInt(s.assigned_id.split('-')[1]) || 0);
+        const nextNumber = existingIds.length > 0 ? Math.max(...existingIds) + 1 : 1;
+        const serverId = `SRV-${nextNumber.toString().padStart(3, '0')}`;
+
+        // Create new server
+        const createData = {
+          asset_id: serverId,
+          type: 'server',
+          brand: formData.model.split(' ')[0] || 'Generic', // Extract brand from model
+          model: formData.model,
+          serial_number: formData.server_name || null, // Use server name as serial for uniqueness
+          asset_tag: formData.asset_tag,
+          department: 'IT',
+          location: formData.location,
+          purchase_date: new Date().toISOString(),
+          warranty_expiry: new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString(), // 3 years from now
+          condition: 'Good',
+          notes: `Server: ${formData.server_name} | OS: ${formData.os} ${formData.os_version} | Description: ${formData.server_description} | Remark: ${formData.remark}`
+        };
+
+        const response = await fetch('http://localhost:8000/api/v1/assets/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(createData),
+        });
+
+        if (response.ok) {
+          toast({
+            title: 'Server Created',
+            description: `${createData.asset_id} has been created successfully.`,
+            status: 'success',
+            duration: 3000,
+            isClosable: true,
+          });
+          
+          // Refresh the server list
+          fetchServers();
+        } else {
+          const result = await response.json();
+          throw new Error(result.detail || 'Failed to create server');
+        }
+      }
+      
+      onClose();
+    } catch (error: any) {
+      toast({
+        title: selectedServer ? 'Update Failed' : 'Creation Failed',
+        description: error.message || 'An error occurred while saving the server',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
     }
-    onClose();
-    toast({
-      title: 'Server Saved',
-      status: 'success',
-      duration: 3000,
-    });
+  };
+
+  // Handle individual server deletion
+  const handleDelete = async (server: Server) => {
+    try {
+      const response = await fetch(`http://localhost:8000/api/v1/assets/${server.id}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        toast({
+          title: 'Server Deleted',
+          description: `Server ${server.assigned_id} has been deleted successfully.`,
+          status: 'success',
+          duration: 3000,
+          isClosable: true,
+        });
+        
+        // Refresh the server list
+        fetchServers();
+      } else {
+        const result = await response.json();
+        toast({
+          title: 'Delete Failed',
+          description: result.detail || 'Failed to delete server',
+          status: 'error',
+          duration: 5000,
+          isClosable: true,
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Delete Error',
+        description: 'Network error occurred during deletion',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    }
+  };
+
+  // Prepare individual delete action
+  const prepareDelete = (server: Server) => {
+    setServerToDelete(server);
+    onDeleteOpen();
   };
 
   // Filter servers based on search and status filters
@@ -473,7 +614,13 @@ const ServerManagement: React.FC = () => {
                           }}>
                             Edit
                           </MenuItem>
-                          <MenuItem icon={<DeleteIcon />} color="red.500">Delete</MenuItem>
+                          <MenuItem 
+                            icon={<DeleteIcon />} 
+                            color="red.500"
+                            onClick={() => prepareDelete(server)}
+                          >
+                            Delete
+                          </MenuItem>
                         </MenuList>
                       </Menu>
                     </Td>
@@ -604,6 +751,59 @@ const ServerManagement: React.FC = () => {
             </ModalFooter>
           </ModalContent>
         </Modal>
+
+        {/* Individual Delete Confirmation Dialog */}
+        <AlertDialog
+          isOpen={isDeleteOpen}
+          leastDestructiveRef={cancelRef}
+          onClose={onDeleteClose}
+        >
+          <AlertDialogOverlay>
+            <AlertDialogContent bg="rgba(26, 32, 44, 0.95)">
+              <AlertDialogHeader fontSize="lg" fontWeight="bold" color="white">
+                Delete Server
+              </AlertDialogHeader>
+
+              <AlertDialogBody color="white">
+                {serverToDelete && (
+                  <VStack align="start" spacing={3}>
+                    <Text>
+                      Are you sure you want to delete <strong>{serverToDelete.assigned_id}</strong>?
+                    </Text>
+                    <Text color="gray.300" fontSize="sm">
+                      <strong>Server Name:</strong> {serverToDelete.server_name}
+                    </Text>
+                    <Text color="gray.300" fontSize="sm">
+                      <strong>Model:</strong> {serverToDelete.model}
+                    </Text>
+                    <Text color="red.300" fontSize="sm">
+                      This action cannot be undone.
+                    </Text>
+                  </VStack>
+                )}
+              </AlertDialogBody>
+
+              <AlertDialogFooter>
+                <Button ref={cancelRef} onClick={onDeleteClose}>
+                  Cancel
+                </Button>
+                <Button 
+                  colorScheme="red" 
+                  onClick={() => {
+                    if (serverToDelete) {
+                      handleDelete(serverToDelete);
+                      onDeleteClose();
+                      setServerToDelete(null);
+                    }
+                  }} 
+                  ml={3}
+                >
+                  Delete
+                </Button>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialogOverlay>
+        </AlertDialog>
       </Container>
     </Box>
   );

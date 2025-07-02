@@ -85,6 +85,7 @@ class AssetUpdate(BaseModel):
     purchase_cost: Optional[str] = None
     condition: Optional[str] = None
     notes: Optional[str] = None
+    status: Optional[str] = None
 
 class AssetResponse(AssetBase):
     id: int
@@ -327,7 +328,16 @@ def update_asset(asset_id: int, asset_update: AssetUpdate, db: Session = Depends
     
     update_data = asset_update.model_dump(exclude_unset=True)
     for key, value in update_data.items():
-        setattr(db_asset, key, value)
+        if key == 'status' and value:
+            # Convert status string to enum
+            try:
+                status_enum = AssetStatus(value)
+                setattr(db_asset, key, status_enum)
+            except ValueError:
+                # Invalid status value, skip this update
+                continue
+        else:
+            setattr(db_asset, key, value)
     
     db_asset.updated_at = datetime.utcnow()
     db.commit()
