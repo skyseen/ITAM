@@ -39,7 +39,7 @@ export interface Asset {
   purchase_cost?: string;
   condition: string;
   notes?: string;
-  status: 'available' | 'in_use' | 'maintenance' | 'retired';
+  status: 'available' | 'pending_for_signature' | 'in_use' | 'maintenance' | 'retired';
   assigned_user_id?: number;
   assigned_user_name?: string;
   created_at: string;
@@ -62,12 +62,27 @@ export interface AssetCreate {
   notes?: string;
 }
 
+export interface AuditLog {
+  id: number;
+  action: string;
+  resource_type: string;
+  resource_id?: string;
+  resource_name?: string;
+  user_name: string;
+  user_role: string;
+  description: string;
+  details?: string;
+  asset_identifier?: string;
+  timestamp: string;
+}
+
 export interface DashboardData {
   total_assets: number;
   assets_by_status: Record<string, number>;
   assets_by_type: Record<string, number>;
   assets_by_department: Record<string, number>;
   recent_issuances: any[];
+  recent_activities: AuditLog[];
   warranty_alerts: Asset[];
   idle_assets: Asset[];
 }
@@ -110,11 +125,17 @@ export const AssetProvider: React.FC<AssetProviderProps> = ({ children }) => {
   }, []);
 
   const fetchDashboardData = useCallback(async () => {
+    setLoading(true);
     try {
+      console.log('Fetching dashboard data...');
       const response = await api.get('/assets/dashboard');
+      console.log('Dashboard data received:', response.data);
       setDashboardData(response.data);
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error);
+      setDashboardData(null);
+    } finally {
+      setLoading(false);
     }
   }, []);
 

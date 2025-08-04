@@ -60,7 +60,7 @@ import {
   WarningIcon,
 } from '@chakra-ui/icons';
 import { useSearchParams } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth, api } from '../contexts/AuthContext';
 
 interface NetworkAppliance {
   id: number;
@@ -72,7 +72,7 @@ interface NetworkAppliance {
   serial_number: string | null;
   asset_tag: string;
   location: string;
-  status: 'available' | 'in_use' | 'maintenance' | 'retired';
+  status: 'available' | 'pending_for_signature' | 'in_use' | 'maintenance' | 'retired';
   asset_checked: boolean;
   remark: string;
 }
@@ -85,7 +85,7 @@ interface NetworkApplianceFormData {
   serial_number: string;
   asset_tag: string;
   location: string;
-  status: 'available' | 'in_use' | 'maintenance' | 'retired';
+  status: 'available' | 'pending_for_signature' | 'in_use' | 'maintenance' | 'retired';
   asset_checked: boolean;
   remark: string;
 }
@@ -98,6 +98,7 @@ const APPLIANCE_TYPES = [
 
 const APPLIANCE_STATUSES = [
   { value: 'available', label: 'Available', color: 'blue' },
+  { value: 'pending_for_signature', label: 'Pending Signature', color: 'yellow' },
   { value: 'in_use', label: 'In Use', color: 'green' },
   { value: 'maintenance', label: 'Maintenance', color: 'orange' },
   { value: 'retired', label: 'Retired', color: 'red' },
@@ -258,32 +259,21 @@ const NetworkApplianceManagement: React.FC = () => {
           notes: `Description: ${formData.network_appliance_description} | Asset Checked: ${formData.asset_checked ? 'Yes' : 'No'} | Remark: ${formData.remark}`
         };
 
-        const response = await fetch(`http://localhost:8000/api/v1/assets/${selectedAppliance.id}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(updateData),
-        });
+        const response = await api.put(`/assets/${selectedAppliance.id}`, updateData);
 
-        if (response.ok) {
-          // Set the updated item ID to highlight it after refresh
-          setLastUpdatedId(selectedAppliance.id);
-          
-          toast({
-            title: 'Network Appliance Updated',
-            description: `${selectedAppliance.assigned_id} has been updated successfully.`,
-            status: 'success',
-            duration: 3000,
-            isClosable: true,
-          });
-          
-          // Refresh the appliance list
-          fetchAppliances();
-        } else {
-          const result = await response.json();
-          throw new Error(result.detail || 'Failed to update network appliance');
-        }
+        // Set the updated item ID to highlight it after refresh
+        setLastUpdatedId(selectedAppliance.id);
+        
+        toast({
+          title: 'Network Appliance Updated',
+          description: `${selectedAppliance.assigned_id} has been updated successfully.`,
+          status: 'success',
+          duration: 3000,
+          isClosable: true,
+        });
+        
+        // Refresh the appliance list
+        fetchAppliances();
       } else {
         // Create new appliance
         const createData = {
@@ -489,31 +479,19 @@ const NetworkApplianceManagement: React.FC = () => {
   // Handle individual appliance deletion
   const handleDelete = async (appliance: NetworkAppliance) => {
     try {
-      const response = await fetch(`http://localhost:8000/api/v1/assets/${appliance.id}`, {
-        method: 'DELETE',
-      });
+      const response = await api.delete(`/assets/${appliance.id}`);
 
-      if (response.ok) {
-        toast({
-          title: 'Appliance Deleted',
-          description: `Network appliance ${appliance.assigned_id} has been deleted successfully.`,
-          status: 'success',
-          duration: 3000,
-          isClosable: true,
-        });
-        
-        // Refresh the appliance list
-        fetchAppliances();
-      } else {
-        const result = await response.json();
-        toast({
-          title: 'Delete Failed',
-          description: result.detail || 'Failed to delete network appliance',
-          status: 'error',
-          duration: 5000,
-          isClosable: true,
-        });
-      }
+      // Axios automatically handles success
+      toast({
+        title: 'Appliance Deleted',
+        description: `Network appliance ${appliance.assigned_id} has been deleted successfully.`,
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
+      
+      // Refresh the appliance list
+      fetchAppliances();
     } catch (error: any) {
       toast({
         title: 'Delete Error',
@@ -1028,7 +1006,7 @@ const NetworkApplianceManagement: React.FC = () => {
                   <FormLabel color="white">Status</FormLabel>
                   <Select
                     value={formData.status}
-                    onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value as 'available' | 'in_use' | 'maintenance' | 'retired' }))}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value as 'available' | 'pending_for_signature' | 'in_use' | 'maintenance' | 'retired' }))}
                     bg="rgba(255, 255, 255, 0.1)"
                     color="white"
                   >

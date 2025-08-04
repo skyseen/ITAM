@@ -35,6 +35,7 @@ import {
 } from '@chakra-ui/icons';
 import { useAssets } from '../../contexts/AssetContext';
 import { useAuth } from '../../contexts/AuthContext';
+import PendingAssetsWidget from './PendingAssetsWidget';
 
 
 
@@ -68,6 +69,7 @@ const CircularStatCard: React.FC<CircularStatCardProps> = ({ title, data, total,
   const allStatuses = [
     { key: 'total', label: 'Total Assets', color: 'purple', value: total },
     { key: 'available', label: 'Available', color: 'green', value: data.available || 0 },
+    { key: 'pending_for_signature', label: 'Pending Signature', color: 'yellow', value: data.pending_for_signature || 0 },
     { key: 'in_use', label: 'In Use', color: 'blue', value: data.in_use || 0 },
     { key: 'maintenance', label: 'Maintenance', color: 'orange', value: data.maintenance || 0 },
     { key: 'retired', label: 'Scrapped', color: 'gray', value: data.retired || 0 },
@@ -187,16 +189,18 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ activities, onViewAll }) =>
             <TimeIcon color="cyan.300" boxSize={5} />
             <Heading size="md" color="white">Recent Activity</Heading>
           </HStack>
-          <Button
-            size="sm"
-            variant="ghost"
-            rightIcon={<ViewIcon />}
-            color="cyan.300"
-            onClick={onViewAll}
-            _hover={{ bg: 'rgba(0, 255, 255, 0.1)' }}
-          >
-            View All
-          </Button>
+          {onViewAll && (
+            <Button
+              size="sm"
+              variant="ghost"
+              rightIcon={<ViewIcon />}
+              color="cyan.300"
+              onClick={onViewAll}
+              _hover={{ bg: 'rgba(0, 255, 255, 0.1)' }}
+            >
+              View All
+            </Button>
+          )}
         </HStack>
       </CardHeader>
       <CardBody>
@@ -206,28 +210,63 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ activities, onViewAll }) =>
               No recent activity
             </Text>
           ) : (
-            activities.slice(0, 5).map((activity, index) => (
-              <HStack 
-                key={index} 
-                p={3} 
-                bg="rgba(255,255,255,0.05)" 
-                borderRadius="md"
-                spacing={3}
-              >
-                <Avatar size="sm" name={activity.user_name} bg="cyan.500" />
-                <VStack align="start" spacing={0} flex={1}>
-                  <Text color="white" fontSize="sm" fontWeight="medium">
-                    {activity.asset_id} → {activity.user_name}
-                  </Text>
-                  <Text color="gray.400" fontSize="xs">
-                    {new Date(activity.issued_date).toLocaleDateString()}
-                  </Text>
-                </VStack>
-                <Badge colorScheme="cyan" variant="subtle">
-                  Assigned
-                </Badge>
-              </HStack>
-            ))
+            activities.slice(0, 5).map((activity, index) => {
+              // Map actions to colors
+              const getActionColor = (action: string) => {
+                switch (action.toLowerCase()) {
+                  case 'create': return 'green';
+                  case 'update': return 'blue';
+                  case 'delete': return 'red';
+                  case 'assign': return 'purple';
+                  case 'unassign': return 'orange';
+                  case 'status_change': return 'teal';
+                  case 'sign_document': return 'cyan';
+                  case 'cancel_issuance': return 'red';
+                  default: return 'gray';
+                }
+              };
+
+              // Format timestamp to relative time
+              const formatTimestamp = (timestamp: string) => {
+                const date = new Date(timestamp);
+                const now = new Date();
+                const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
+                
+                if (diffInMinutes < 1) return 'Just now';
+                if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+                
+                const diffInHours = Math.floor(diffInMinutes / 60);
+                if (diffInHours < 24) return `${diffInHours}h ago`;
+                
+                const diffInDays = Math.floor(diffInHours / 24);
+                if (diffInDays < 7) return `${diffInDays}d ago`;
+                
+                return date.toLocaleDateString();
+              };
+
+              return (
+                <HStack 
+                  key={activity.id || index} 
+                  p={3} 
+                  bg="rgba(255,255,255,0.05)" 
+                  borderRadius="md"
+                  spacing={3}
+                >
+                  <Avatar size="sm" name={activity.user_name} bg="cyan.500" />
+                  <VStack align="start" spacing={0} flex={1}>
+                    <Text color="white" fontSize="sm" fontWeight="medium">
+                      {activity.description}
+                    </Text>
+                    <Text color="gray.400" fontSize="xs">
+                      {formatTimestamp(activity.timestamp)} • {activity.user_name}
+                    </Text>
+                  </VStack>
+                  <Badge colorScheme={getActionColor(activity.action)} variant="subtle">
+                    {activity.action.replace('_', ' ').toUpperCase()}
+                  </Badge>
+                </HStack>
+              );
+            })
           )}
         </VStack>
       </CardBody>
@@ -382,10 +421,14 @@ const FuturisticDashboard: React.FC = () => {
 
             {/* Recent Activity */}
             <ActivityFeed
-              activities={dashboardData.recent_issuances}
-              onViewAll={() => navigate('/assets?status=in_use')}
+              activities={dashboardData.recent_activities}
             />
           </Grid>
+
+          {/* Pending Assets Widget */}
+          <Box maxW="600px" mx="auto">
+            <PendingAssetsWidget />
+          </Box>
 
           {/* Department Distribution */}
           <Card

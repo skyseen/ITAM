@@ -80,7 +80,7 @@ import {
 
 // Import contexts for data management and authentication
 import { useAssets, Asset } from '../contexts/AssetContext';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth, api } from '../contexts/AuthContext';
 
 // Import navigation hook
 import { useNavigate } from 'react-router-dom';
@@ -164,6 +164,8 @@ const AssetRow: React.FC<AssetRowProps> = ({
   const canDelete = userRole === 'admin';
   const canIssue = asset.status === 'available' && canEdit;
   const canReturn = asset.status === 'in_use' && canEdit;
+  
+
 
   return (
     <Tr 
@@ -276,6 +278,8 @@ const AssetRow: React.FC<AssetRowProps> = ({
             variant="ghost"
             size="sm"
             aria-label="Asset actions"
+            _hover={{ bg: 'rgba(255, 255, 255, 0.1)' }}
+            color="white"
           />
           <MenuList>
             {/* View Details - Available to all users */}
@@ -340,14 +344,15 @@ const AssetList: React.FC = () => {
   
   // Get asset management functions from context
   const { 
-    assets, 
-    loading, 
-    fetchAssets, 
     deleteAsset, 
     issueAsset, 
     returnAsset, 
     exportAssets 
   } = useAssets();
+  
+  // Local state for assets and loading (using new endpoint)
+  const [assets, setAssets] = useState<Asset[]>([]);
+  const [loading, setLoading] = useState(false);
   
   // Toast notifications for user feedback
   const toast = useToast();
@@ -385,21 +390,37 @@ const AssetList: React.FC = () => {
    * This ensures the list is always up to date with current filters
    */
   useEffect(() => {
-    const fetchParams = {
-      skip: pagination.page * pagination.limit,
-      limit: pagination.limit,
-      ...filters,
+    const fetchUserAssets = async () => {
+      setLoading(true);
+      try {
+        const params = new URLSearchParams({
+          skip: (pagination.page * pagination.limit).toString(),
+          limit: pagination.limit.toString(),
+          ...(filters.status && { status: filters.status }),
+          ...(filters.department && { department: filters.department }),
+          ...(filters.search && { search: filters.search }),
+        });
+        
+        // Use the new user-types endpoint for better performance
+        const response = await api.get(`/assets/user-types?${params}`);
+        setAssets(response.data);
+      } catch (error) {
+        console.error('Failed to fetch user assets:', error);
+        setAssets([]);
+      } finally {
+        setLoading(false);
+      }
     };
-    
-    // If no specific asset type is selected, show all user asset types
-    // If a specific type is selected, use that filter
-    if (!filters.asset_type) {
-      // Show all user assets (laptop, desktop, tablet)
-      fetchParams.asset_type = 'laptop,desktop,tablet';
-    }
-    
-    fetchAssets(fetchParams);
-  }, [fetchAssets, filters, pagination]);
+
+    fetchUserAssets();
+  }, [filters, pagination.page, pagination.limit]);
+
+  /**
+   * Update pagination total when assets change
+   */
+  useEffect(() => {
+    setPagination(prev => ({ ...prev, total: assets.length }));
+  }, [assets]);
 
   /**
    * Handle filter changes with debouncing for search input
@@ -620,6 +641,7 @@ const AssetList: React.FC = () => {
                   }}
                 >
                   <option value="available" style={{ background: '#2D3748', color: 'white' }}>Available</option>
+                  <option value="pending_for_signature" style={{ background: '#2D3748', color: 'white' }}>Pending Signature</option>
                   <option value="in_use" style={{ background: '#2D3748', color: 'white' }}>In Use</option>
                   <option value="maintenance" style={{ background: '#2D3748', color: 'white' }}>Maintenance</option>
                   <option value="retired" style={{ background: '#2D3748', color: 'white' }}>Retired</option>
@@ -746,27 +768,29 @@ const AssetList: React.FC = () => {
       {assets.length > 0 && (
         <Flex justify="space-between" align="center" mt={6}>
           <Text color="gray.600">
-            Showing {pagination.page * pagination.limit + 1} to{' '}
-            {Math.min((pagination.page + 1) * pagination.limit, pagination.total)} of{' '}
-            {pagination.total} assets
+            Showing {Math.min(pagination.page * pagination.limit + 1, assets.length)} to{' '}
+            {Math.min((pagination.page + 1) * pagination.limit, assets.length)} of{' '}
+            {assets.length} assets
           </Text>
           
-          <HStack spacing={2}>
-            <Button
-              size="sm"
-              onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
-              isDisabled={pagination.page === 0}
-            >
-              Previous
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
-              isDisabled={(pagination.page + 1) * pagination.limit >= pagination.total}
-            >
-              Next
-            </Button>
-          </HStack>
+          {assets.length > pagination.limit && (
+            <HStack spacing={2}>
+              <Button
+                size="sm"
+                onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
+                isDisabled={pagination.page === 0}
+              >
+                Previous
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+                isDisabled={(pagination.page + 1) * pagination.limit >= assets.length}
+              >
+                Next
+              </Button>
+            </HStack>
+          )}
         </Flex>
       )}
 

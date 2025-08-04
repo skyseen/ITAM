@@ -155,7 +155,7 @@ const SimpleDashboard: React.FC = () => {
                   Asset Status Overview
                 </Text>
                 <VStack spacing={4} align="stretch">
-                  {['available', 'in_use', 'maintenance', 'retired'].map((status) => {
+                  {['available', 'pending_for_signature', 'in_use', 'maintenance', 'retired'].map((status) => {
                     const count = assets.filter((a: any) => a.status === status).length;
                     const percentage = totalAssets > 0 ? (count / totalAssets) * 100 : 0;
                     

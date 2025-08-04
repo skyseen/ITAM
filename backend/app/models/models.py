@@ -30,14 +30,16 @@ class AssetStatus(enum.Enum):
     
     This enum defines the lifecycle states an asset can be in:
     - AVAILABLE: Asset is ready for assignment to users
+    - PENDING_FOR_SIGNATURE: Asset assigned but waiting for user to sign documents
     - IN_USE: Asset is currently assigned and being used
     - MAINTENANCE: Asset is being repaired or serviced
     - RETIRED: Asset is end-of-life and no longer in service
     """
-    AVAILABLE = "available"     # Asset is ready for assignment
-    IN_USE = "in_use"          # Asset is currently assigned to a user
-    MAINTENANCE = "maintenance" # Asset is under repair or maintenance
-    RETIRED = "retired"        # Asset is end-of-life, no longer usable
+    AVAILABLE = "available"                # Asset is ready for assignment
+    PENDING_FOR_SIGNATURE = "pending_for_signature"  # Asset assigned, awaiting signature
+    IN_USE = "in_use"                     # Asset is currently assigned to a user
+    MAINTENANCE = "maintenance"           # Asset is under repair or maintenance
+    RETIRED = "retired"                   # Asset is end-of-life, no longer usable
 
 
 class UserRole(enum.Enum):
@@ -148,6 +150,12 @@ class Asset(Base):
     status = Column(SQLEnum(AssetStatus), default=AssetStatus.AVAILABLE,
                    doc="Current lifecycle status of the asset")
     
+    # Operating System information (for servers and computers)
+    os = Column(String(100), nullable=True,
+                doc="Operating system name (e.g., Windows Server 2019, Ubuntu Server 20.04)")
+    os_version = Column(String(50), nullable=True,
+                       doc="Operating system version (e.g., 10.0(14393), 5.4.0-74)")
+    
     # Assignment tracking
     assigned_user_id = Column(Integer, ForeignKey("users.id"), nullable=True,
                              doc="ID of user currently assigned this asset (if any)")
@@ -254,18 +262,20 @@ class Notification(Base):
 
 class AuditLog(Base):
     """
-    Audit log model for tracking all system actions.
+    Enhanced audit log model for tracking all system actions and changes.
     
-    This model provides a complete audit trail of all significant actions
-    performed in the system. It tracks who did what, when, and provides
-    details about the changes made. This is essential for compliance,
-    security, and debugging purposes.
+    This model provides a comprehensive audit trail of all significant actions
+    performed in the system, including asset management, user actions, and
+    administrative operations. Each log entry captures who did what, when,
+    and provides context for the action.
     
     Actions tracked include:
     - Asset creation, modification, deletion
-    - User management actions
+    - User management actions  
     - Asset issuances and returns
     - Status changes
+    - Document signing
+    - Bulk operations
     """
     __tablename__ = "audit_logs"
 
@@ -274,25 +284,51 @@ class AuditLog(Base):
     
     # Action classification
     action = Column(String(100), nullable=False,
-                   doc="Type of action performed (create, update, delete, issue, return)")
-    entity_type = Column(String(50), nullable=False,
-                        doc="Type of entity affected (asset, user, issuance)")
-    entity_id = Column(Integer, nullable=False,
-                      doc="ID of the specific entity that was affected")
+                   doc="Type of action performed (create, update, delete, assign, status_change, sign_document, etc.)")
+    resource_type = Column(String(50), nullable=False,
+                          doc="Type of resource affected (asset, user, server, network_appliance, etc.)")
+    resource_id = Column(String(50), nullable=True,
+                        doc="ID of the affected resource (asset_id, user_id, etc.)")
+    resource_name = Column(String(200), nullable=True,
+                          doc="Human-readable name of the affected resource")
     
     # Actor information
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False,
                     doc="ID of the user who performed the action")
+    user_name = Column(String(100), nullable=False,
+                      doc="Name of user at time of action (for historical reference)")
+    user_role = Column(String(20), nullable=False,
+                      doc="Role of user at time of action")
     
-    # Action details
-    details = Column(Text, doc="Detailed description of what was changed")
+    # Action details and context
+    description = Column(Text, nullable=False,
+                        doc="Human-readable description of the action")
+    details = Column(Text, nullable=True,
+                    doc="Additional details or metadata (JSON format)")
+    old_values = Column(Text, nullable=True,
+                       doc="Previous values before change (JSON format)")
+    new_values = Column(Text, nullable=True,
+                       doc="New values after change (JSON format)")
     
-    # Audit timestamp
+    # Asset-specific tracking (for asset-related actions)
+    asset_id = Column(Integer, ForeignKey("assets.id"), nullable=True,
+                     doc="Related asset database ID (if applicable)")
+    asset_identifier = Column(String(50), nullable=True,
+                             doc="Asset identifier at time of action (e.g., LAP-001)")
+    
+    # IP and session tracking
+    ip_address = Column(String(45), nullable=True,
+                       doc="IP address of user performing action")
+    user_agent = Column(String(500), nullable=True,
+                       doc="Browser/client user agent")
+    
+    # Timestamps
     timestamp = Column(DateTime, default=datetime.utcnow,
-                      doc="Exact timestamp when the action was performed")
+                      doc="When the action occurred")
 
     # Relationships
     user = relationship("User", doc="User who performed the action")
+    asset = relationship("Asset", doc="Asset related to this action (if applicable)")
 
 
 class DocumentType(enum.Enum):

@@ -149,7 +149,7 @@ const UserDashboard: React.FC = () => {
       if (documentsResponse.ok) {
         const documents = await documentsResponse.json();
         console.log('Fetched documents:', documents); // Debug log
-        const pending = documents.filter((doc: any) => doc.status === 'pending');
+        const pending = documents.filter((doc: any) => doc.status?.toLowerCase() === 'pending');
         console.log('Pending documents:', pending); // Debug log
         setPendingDocuments(pending);
         
@@ -166,20 +166,18 @@ const UserDashboard: React.FC = () => {
         });
       }
 
-      // Fetch user's assigned assets - use correct API endpoint
-      const assetsResponse = await fetch(`http://localhost:8000/api/v1/assets/`, {
+      // Fetch user's assigned assets using dedicated endpoint
+      const assetsResponse = await fetch(`http://localhost:8000/api/v1/assets/assigned-to/${user.id}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
         },
       });
       
       if (assetsResponse.ok) {
-        const allAssets = await assetsResponse.json();
-        // Filter for assets assigned to current user
-        const userAssets = allAssets.filter((asset: any) => asset.assigned_user_id === user.id);
+        const userAssets = await assetsResponse.json();
         setAssignedAssets(userAssets);
       } else {
-        console.error('Failed to fetch assets:', await assetsResponse.text());
+        console.error('Failed to fetch user assets:', await assetsResponse.text());
       }
       
     } catch (error) {

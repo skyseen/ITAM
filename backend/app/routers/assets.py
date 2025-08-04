@@ -43,14 +43,82 @@ import csv
 import io
 
 from app.core.database import get_db
-from app.models.models import Asset, AssetIssuance, AssetStatus, User, Notification, AssetDocument, DocumentType, DocumentStatus
+from app.models.models import Asset, AssetIssuance, AssetStatus, User, UserRole, Notification, AssetDocument, DocumentType, DocumentStatus, AuditLog
+from .auth import get_current_user
 from pydantic import BaseModel
 from typing import Dict, Any
+import json
+
+def get_system_user(db: Session):
+    """Get or create a system user for audit logging when no authenticated user is available"""
+    system_user = db.query(User).filter(User.username == "system").first()
+    if not system_user:
+        # Create a system user if it doesn't exist
+        system_user = User(
+            username="system",
+            email="system@itam.local",
+            full_name="System User",
+            department="IT",
+            role=UserRole.ADMIN,
+            is_active=True,
+            hashed_password="system"  # This won't be used for login
+        )
+        db.add(system_user)
+        db.commit()
+        db.refresh(system_user)
+    return system_user
 
 router = APIRouter(
     prefix="/assets",
     tags=["assets"]
 )
+
+
+
+def log_audit_action(
+    db: Session,
+    action: str,
+    resource_type: str,
+    resource_id: Optional[str],
+    resource_name: Optional[str],
+    user_id: int,
+    user_name: str,
+    user_role: str,
+    description: str,
+    details: Optional[str] = None,
+    old_values: Optional[str] = None,
+    new_values: Optional[str] = None,
+    asset_id: Optional[int] = None,
+    asset_identifier: Optional[str] = None,
+    ip_address: Optional[str] = None,
+    user_agent: Optional[str] = None
+):
+    """
+    Utility function to create audit log entries.
+    
+    This function standardizes audit logging across the application by creating
+    comprehensive audit trail records for all significant actions.
+    """
+    audit_log = AuditLog(
+        action=action,
+        resource_type=resource_type,
+        resource_id=resource_id,
+        resource_name=resource_name,
+        user_id=user_id,
+        user_name=user_name,
+        user_role=user_role,
+        description=description,
+        details=details,
+        old_values=old_values,
+        new_values=new_values,
+        asset_id=asset_id,
+        asset_identifier=asset_identifier,
+        ip_address=ip_address,
+        user_agent=user_agent
+    )
+    db.add(audit_log)
+    db.commit()
+    return audit_log
 
 # Pydantic models
 class AssetBase(BaseModel):
@@ -67,6 +135,8 @@ class AssetBase(BaseModel):
     purchase_cost: Optional[str] = None
     condition: str = "Good"
     notes: Optional[str] = None
+    os: Optional[str] = None
+    os_version: Optional[str] = None
 
 class AssetCreate(AssetBase):
     pass
@@ -86,6 +156,8 @@ class AssetUpdate(BaseModel):
     condition: Optional[str] = None
     notes: Optional[str] = None
     status: Optional[str] = None
+    os: Optional[str] = None
+    os_version: Optional[str] = None
 
 class AssetResponse(AssetBase):
     id: int
@@ -118,12 +190,43 @@ class AssetIssuanceResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class AuditLogResponse(BaseModel):
+    id: int
+    action: str
+    resource_type: str
+    resource_id: Optional[str]
+    resource_name: Optional[str]
+    user_name: str
+    user_role: str
+    description: str
+    details: Optional[str]
+    asset_identifier: Optional[str]
+    timestamp: datetime
+
+    class Config:
+        from_attributes = True
+
+class DocumentSignRequest(BaseModel):
+    signature_data: str  # Base64 encoded signature
+    document_data: Optional[str] = None  # JSON form data
+
+class DocumentResponse(BaseModel):
+    id: int
+    document_type: str
+    status: str
+    created_at: datetime
+    signed_at: Optional[datetime]
+
+class CancelIssuanceRequest(BaseModel):
+    reason: str
+
 class DashboardData(BaseModel):
     total_assets: int
     assets_by_status: Dict[str, int]
     assets_by_type: Dict[str, int]
     assets_by_department: Dict[str, int]
     recent_issuances: List[AssetIssuanceResponse]
+    recent_activities: List[AuditLogResponse]  # Add recent activities
     warranty_alerts: List[AssetResponse]
     idle_assets: List[AssetResponse]
 
@@ -144,6 +247,12 @@ def get_dashboard_data(db: Session = Depends(get_db)):
         Asset.status, func.count(Asset.id)
     ).filter(user_assets_filter).group_by(Asset.status).all()
     assets_by_status = {status.value: count for status, count in status_counts}
+    
+    # Ensure all status types are included, even if count is 0
+    all_statuses = ['available', 'pending_for_signature', 'in_use', 'maintenance', 'retired']
+    for status in all_statuses:
+        if status not in assets_by_status:
+            assets_by_status[status] = 0
     
     # Assets by type (ALL asset types including servers and network appliances)
     type_counts = db.query(
@@ -213,19 +322,84 @@ def get_dashboard_data(db: Session = Depends(get_db)):
             asset_response.assigned_user_name = user.full_name if user else None
         idle_assets.append(asset_response)
     
+    # Recent activities (last 10 audit logs)
+    recent_activities_query = db.query(AuditLog).order_by(AuditLog.timestamp.desc()).limit(10).all()
+    recent_activities = [AuditLogResponse.from_orm(activity) for activity in recent_activities_query]
+    
     return DashboardData(
         total_assets=total_assets,
         assets_by_status=assets_by_status,
         assets_by_type=assets_by_type,
         assets_by_department=assets_by_department,
         recent_issuances=recent_issuances,
+        recent_activities=recent_activities,
         warranty_alerts=warranty_alerts,
         idle_assets=idle_assets
     )
 
+# Audit log endpoints
+@router.get("/audit-logs", response_model=List[AuditLogResponse])
+def get_audit_logs(
+    limit: int = Query(50, le=100, description="Maximum number of logs to return"),
+    offset: int = Query(0, ge=0, description="Number of logs to skip"),
+    resource_type: Optional[str] = Query(None, description="Filter by resource type"),
+    action: Optional[str] = Query(None, description="Filter by action type"),
+    db: Session = Depends(get_db)
+):
+    """Get audit logs with optional filtering and pagination"""
+    query = db.query(AuditLog)
+    
+    if resource_type:
+        query = query.filter(AuditLog.resource_type == resource_type)
+    if action:
+        query = query.filter(AuditLog.action == action)
+    
+    audit_logs = query.order_by(AuditLog.timestamp.desc()).offset(offset).limit(limit).all()
+    return [AuditLogResponse.from_orm(log) for log in audit_logs]
+
+@router.get("/pending-signature", response_model=List[Dict[str, Any]])
+def get_pending_signature_assets(db: Session = Depends(get_db)):
+    """Get assets that are pending signature with time information"""
+    assets = db.query(Asset).filter(Asset.status == AssetStatus.PENDING_FOR_SIGNATURE).all()
+    
+    result = []
+    for asset in assets:
+        # Get the user assigned to this asset
+        user = db.query(User).filter(User.id == asset.assigned_user_id).first()
+        
+        # Get the latest issuance record to find when it was assigned
+        issuance = db.query(AssetIssuance).filter(
+            and_(
+                AssetIssuance.asset_id == asset.id,
+                AssetIssuance.return_date.is_(None)
+            )
+        ).order_by(AssetIssuance.issued_date.desc()).first()
+        
+        # Calculate days pending
+        days_pending = 0
+        if issuance:
+            days_pending = (datetime.utcnow() - issuance.issued_date).days
+        
+        result.append({
+            "id": asset.id,
+            "asset_id": asset.asset_id,
+            "asset_name": f"{asset.brand} {asset.model}",
+            "user_name": user.full_name if user else "Unknown",
+            "user_id": asset.assigned_user_id,
+            "assigned_date": issuance.issued_date.isoformat() if issuance else None,
+            "days_pending": days_pending,
+            "is_overdue": days_pending > 3,  # Mark as overdue after 3 days
+            "issuance_id": issuance.id if issuance else None  # Include issuance ID for cancellation
+        })
+    
+    return result
+
 # Asset CRUD operations
 @router.post("/", response_model=AssetResponse, status_code=status.HTTP_201_CREATED)
-def create_asset(asset: AssetCreate, db: Session = Depends(get_db)):
+def create_asset(
+    asset: AssetCreate, 
+    db: Session = Depends(get_db)
+):
     """Create a new asset"""
     # Check if asset_id already exists
     existing_asset = db.query(Asset).filter(Asset.asset_id == asset.asset_id).first()
@@ -239,6 +413,33 @@ def create_asset(asset: AssetCreate, db: Session = Depends(get_db)):
     db.add(db_asset)
     db.commit()
     db.refresh(db_asset)
+    
+    # Get user for audit logging (use system user if not authenticated)
+    audit_user = get_system_user(db)
+    
+    # Log the asset creation action
+    log_audit_action(
+        db=db,
+        action="create",
+        resource_type="asset",
+        resource_id=str(db_asset.id),
+        resource_name=f"{db_asset.brand} {db_asset.model}",
+        user_id=audit_user.id,
+        user_name=audit_user.full_name,
+        user_role=audit_user.role.value,
+        description=f"Asset {db_asset.asset_id} created",
+        details=f"Type: {db_asset.type}, Status: {db_asset.status.value}, Department: {db_asset.department}",
+        new_values=json.dumps({
+            "asset_id": db_asset.asset_id,
+            "type": db_asset.type,
+            "brand": db_asset.brand,
+            "model": db_asset.model,
+            "status": db_asset.status.value,
+            "department": db_asset.department
+        }),
+        asset_id=db_asset.id,
+        asset_identifier=db_asset.asset_id
+    )
     
     asset_response = AssetResponse.from_orm(db_asset)
     return asset_response
@@ -296,6 +497,77 @@ def get_assets(
     
     return result
 
+@router.get("/assigned-to/{user_id}", response_model=List[AssetResponse])
+def get_user_assigned_assets(
+    user_id: int, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get all assets assigned to a specific user"""
+    # Verify user exists
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Get assets assigned to the user
+    assets = db.query(Asset).filter(Asset.assigned_user_id == user_id).all()
+    
+    # Convert to response format with user names
+    result = []
+    for asset in assets:
+        asset_response = AssetResponse.from_orm(asset)
+        asset_response.assigned_user_name = user.full_name
+        result.append(asset_response)
+    
+    return result
+
+@router.get("/user-types", response_model=List[AssetResponse])
+def get_user_type_assets(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    status: Optional[str] = Query(None),
+    department: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """Get user assets (laptop, desktop, tablet) with filtering"""
+    # Define user asset types
+    user_asset_types = ['laptop', 'desktop', 'tablet']
+    query = db.query(Asset).filter(Asset.type.in_(user_asset_types))
+    
+    # Apply filters
+    if status and status.strip():
+        try:
+            status_enum = AssetStatus(status.strip())
+            query = query.filter(Asset.status == status_enum)
+        except ValueError:
+            pass
+    if department and department.strip():
+        query = query.filter(Asset.department == department.strip())
+    if search and search.strip():
+        search_term = f"%{search.strip()}%"
+        query = query.filter(
+            or_(
+                Asset.asset_id.ilike(search_term),
+                Asset.brand.ilike(search_term),
+                Asset.model.ilike(search_term),
+                Asset.serial_number.ilike(search_term)
+            )
+        )
+    
+    assets = query.offset(skip).limit(limit).all()
+    
+    # Add assigned user names
+    result = []
+    for asset in assets:
+        asset_response = AssetResponse.from_orm(asset)
+        if asset.assigned_user_id:
+            user = db.query(User).filter(User.id == asset.assigned_user_id).first()
+            asset_response.assigned_user_name = user.full_name if user else None
+        result.append(asset_response)
+    
+    return result
+
 @router.get("/{asset_id}", response_model=AssetResponse)
 def get_asset(asset_id: int, db: Session = Depends(get_db)):
     """Get a specific asset by ID"""
@@ -311,11 +583,28 @@ def get_asset(asset_id: int, db: Session = Depends(get_db)):
     return asset_response
 
 @router.put("/{asset_id}", response_model=AssetResponse)
-def update_asset(asset_id: int, asset_update: AssetUpdate, db: Session = Depends(get_db)):
+def update_asset(
+    asset_id: int, 
+    asset_update: AssetUpdate, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)  # Require authentication
+):
     """Update an asset"""
+
+    
     db_asset = db.query(Asset).filter(Asset.id == asset_id).first()
     if db_asset is None:
         raise HTTPException(status_code=404, detail="Asset not found")
+    
+    # Store original values for audit logging
+    original_values = {}
+    for key in asset_update.model_dump(exclude_unset=True).keys():
+        if hasattr(db_asset, key):
+            original_value = getattr(db_asset, key)
+            if hasattr(original_value, 'value'):  # Handle enums
+                original_values[key] = original_value.value
+            else:
+                original_values[key] = original_value
     
     # Check if asset_id already exists (if being updated)
     if asset_update.asset_id and asset_update.asset_id != db_asset.asset_id:
@@ -327,19 +616,69 @@ def update_asset(asset_id: int, asset_update: AssetUpdate, db: Session = Depends
             )
     
     update_data = asset_update.model_dump(exclude_unset=True)
+    new_values = {}
+    
     for key, value in update_data.items():
         if key == 'status' and value:
             # Convert status string to enum
             try:
                 status_enum = AssetStatus(value)
                 setattr(db_asset, key, status_enum)
+                new_values[key] = value
             except ValueError:
                 # Invalid status value, skip this update
                 continue
         else:
             setattr(db_asset, key, value)
+            new_values[key] = value
     
     db_asset.updated_at = datetime.utcnow()
+    
+    # Log the asset update action - only log fields that actually changed
+    changed_fields = []
+    changed_old_values = {}
+    changed_new_values = {}
+    
+    for key in new_values:
+        if key in original_values:
+            old_val = original_values[key]
+            new_val = new_values[key]
+            
+            # Handle None/empty string comparisons properly
+            old_str = str(old_val).strip() if old_val is not None else ""
+            new_str = str(new_val).strip() if new_val is not None else ""
+            
+            # Only log if there's a meaningful change
+            if old_str != new_str:
+                # Store the actual changed values for JSON columns
+                changed_old_values[key] = old_val
+                changed_new_values[key] = new_val
+                
+                # Format the display values nicely for details column
+                old_display = f'"{old_val}"' if old_val and str(old_val).strip() else '(empty)'
+                new_display = f'"{new_val}"' if new_val and str(new_val).strip() else '(empty)'
+                
+                changed_fields.append(f"{key}: {old_display} → {new_display}")
+    
+    if changed_fields:
+        # Use authenticated user for audit logging
+        log_audit_action(
+            db=db,
+            action="update",
+            resource_type="asset",
+            resource_id=str(db_asset.id),
+            resource_name=f"{db_asset.brand} {db_asset.model}",
+            user_id=current_user.id,
+            user_name=current_user.full_name,
+            user_role=current_user.role.value,
+            description=f"Asset {db_asset.asset_id} updated",
+            details=f"{', '.join(changed_fields)}",
+            old_values=json.dumps(changed_old_values),  # Only changed fields
+            new_values=json.dumps(changed_new_values),  # Only changed fields
+            asset_id=db_asset.id,
+            asset_identifier=db_asset.asset_id
+        )
+    
     db.commit()
     db.refresh(db_asset)
     
@@ -351,7 +690,10 @@ def update_asset(asset_id: int, asset_update: AssetUpdate, db: Session = Depends
     return asset_response
 
 @router.delete("/{asset_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_asset(asset_id: int, db: Session = Depends(get_db)):
+def delete_asset(
+    asset_id: int, 
+    db: Session = Depends(get_db)
+):
     """Delete an asset"""
     asset = db.query(Asset).filter(Asset.id == asset_id).first()
     if asset is None:
@@ -371,6 +713,37 @@ def delete_asset(asset_id: int, db: Session = Depends(get_db)):
             detail="Cannot delete asset that is currently issued"
         )
     
+    # Store essential asset info for audit logging before deletion
+    asset_info = {
+        "asset_id": asset.asset_id,
+        "brand": asset.brand,
+        "model": asset.model,
+        "type": asset.type,
+        "status": asset.status.value if asset.status else None,
+        "department": asset.department,
+        "location": asset.location
+    }
+    
+    # Get user for audit logging (use system user if not authenticated)
+    audit_user = get_system_user(db)
+    
+    # Log the asset deletion action
+    log_audit_action(
+        db=db,
+        action="delete",
+        resource_type="asset",
+        resource_id=str(asset.id),
+        resource_name=f"{asset.brand} {asset.model}",
+        user_id=audit_user.id,
+        user_name=audit_user.full_name,
+        user_role=audit_user.role.value,
+        description=f"Asset {asset.asset_id} deleted",
+        details=f"Deleted asset: {asset.asset_id} ({asset.brand} {asset.model})",
+        old_values=json.dumps(asset_info),
+        asset_id=asset.id,
+        asset_identifier=asset.asset_id
+    )
+    
     db.delete(asset)
     db.commit()
     return None
@@ -380,7 +753,8 @@ def delete_asset(asset_id: int, db: Session = Depends(get_db)):
 def issue_asset(
     asset_id: int,
     issuance: AssetIssuanceCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """Issue an asset to a user"""
     asset = db.query(Asset).filter(Asset.id == asset_id).first()
@@ -405,8 +779,8 @@ def issue_asset(
     )
     db.add(db_issuance)
     
-    # Update asset status and department (asset follows user's department)
-    asset.status = AssetStatus.IN_USE
+    # Update asset status to pending signature and assign user
+    asset.status = AssetStatus.PENDING_FOR_SIGNATURE  # Asset is pending until documents are signed
     asset.assigned_user_id = issuance.user_id
     asset.department = user.department  # Update department to user's department
     asset.updated_at = datetime.utcnow()
@@ -430,6 +804,22 @@ def issue_asset(
     
     db.commit()
     db.refresh(db_issuance)
+    
+    # Log the asset issuance action
+    log_audit_action(
+        db=db,
+        action="assign",
+        resource_type="asset",
+        resource_id=str(asset.id),
+        resource_name=f"{asset.brand} {asset.model}",
+        user_id=current_user.id,  # Use actual current user
+        user_name=current_user.full_name,  # Use actual current user name
+        user_role=current_user.role.value,  # Use actual current user role
+        description=f"Asset {asset.asset_id} assigned to {user.full_name} (pending signature)",
+        details=f"Asset type: {asset.type}, Expected return: {issuance.expected_return_date}",
+        asset_id=asset.id,
+        asset_identifier=asset.asset_id
+    )
     
     return AssetIssuanceResponse(
         id=db_issuance.id,
@@ -490,6 +880,166 @@ def return_asset(asset_id: int, db: Session = Depends(get_db)):
         notes=issuance.notes,
         issued_by=issuance.issued_by
     )
+
+@router.post("/documents/{document_id}/sign", response_model=DocumentResponse)
+def sign_document(
+    document_id: int,
+    sign_request: DocumentSignRequest,
+    db: Session = Depends(get_db)
+):
+    """Sign a pending document for asset issuance"""
+    # Get the document
+    document = db.query(AssetDocument).filter(AssetDocument.id == document_id).first()
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    if document.status != DocumentStatus.PENDING:
+        raise HTTPException(status_code=400, detail="Document is not pending signature")
+    
+    # Check if document has expired
+    if document.expires_at and document.expires_at < datetime.utcnow():
+        document.status = DocumentStatus.EXPIRED
+        db.commit()
+        raise HTTPException(status_code=400, detail="Document has expired")
+    
+    # Update document with signature
+    document.status = DocumentStatus.SIGNED
+    document.signature_data = sign_request.signature_data
+    document.document_data = sign_request.document_data
+    document.signed_at = datetime.utcnow()
+    
+    # Get asset and user info for logging
+    asset = db.query(Asset).filter(Asset.id == document.asset_id).first()
+    user = db.query(User).filter(User.id == document.user_id).first()
+    
+    # Check if all documents for this asset issuance are now signed
+    all_documents = db.query(AssetDocument).filter(
+        and_(
+            AssetDocument.asset_id == document.asset_id,
+            AssetDocument.user_id == document.user_id,
+            AssetDocument.status.in_([DocumentStatus.PENDING, DocumentStatus.SIGNED])
+        )
+    ).all()
+    
+    all_signed = all(doc.status == DocumentStatus.SIGNED for doc in all_documents)
+    
+    if all_signed and asset:
+        # All documents signed - transition asset to IN_USE
+        asset.status = AssetStatus.IN_USE
+        asset.updated_at = datetime.utcnow()
+        
+        # Log the status change
+        log_audit_action(
+            db=db,
+            action="status_change",
+            resource_type="asset",
+            resource_id=str(asset.id),
+            resource_name=f"{asset.brand} {asset.model}",
+            user_id=user.id if user else 1,
+            user_name=user.full_name if user else "System",
+            user_role=user.role.value if user else "user",
+            description=f"Asset {asset.asset_id} is now in use after all documents were signed by {user.full_name if user else 'user'}",
+            details=f"All required documents signed for asset issuance",
+            asset_id=asset.id,
+            asset_identifier=asset.asset_id
+        )
+    
+    # Log the document signing action
+    log_audit_action(
+        db=db,
+        action="sign_document",
+        resource_type="document",
+        resource_id=str(document.id),
+        resource_name=f"{document.document_type.value} for {asset.asset_id if asset else 'asset'}",
+        user_id=user.id if user else 1,
+        user_name=user.full_name if user else "User",
+        user_role=user.role.value if user else "user",
+        description=f"Document {document.document_type.value} signed by {user.full_name if user else 'user'}",
+        details=f"Asset: {asset.asset_id if asset else 'unknown'}, Document type: {document.document_type.value}",
+        asset_id=asset.id if asset else None,
+        asset_identifier=asset.asset_id if asset else None
+    )
+    
+    db.commit()
+    db.refresh(document)
+    
+    return DocumentResponse(
+        id=document.id,
+        document_type=document.document_type.value,
+        status=document.status.value,
+        created_at=document.created_at,
+        signed_at=document.signed_at
+    )
+
+@router.post("/issuances/{issuance_id}/cancel")
+def cancel_issuance(
+    issuance_id: int,
+    cancel_request: CancelIssuanceRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Cancel an asset issuance and revert asset to available status"""
+    # Get the issuance
+    issuance = db.query(AssetIssuance).filter(AssetIssuance.id == issuance_id).first()
+    if not issuance:
+        raise HTTPException(status_code=404, detail="Issuance not found")
+    
+    # Get the asset
+    asset = db.query(Asset).filter(Asset.id == issuance.asset_id).first()
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+    
+    # Only allow cancellation if asset is pending signature or in use
+    if asset.status not in [AssetStatus.PENDING_FOR_SIGNATURE, AssetStatus.IN_USE]:
+        raise HTTPException(
+            status_code=400, 
+            detail="Can only cancel pending or active issuances"
+        )
+    
+    # Get user for logging
+    user = db.query(User).filter(User.id == issuance.user_id).first()
+    
+    # Revert asset status
+    asset.status = AssetStatus.AVAILABLE
+    asset.assigned_user_id = None
+    asset.department = "IT"  # Reset to IT department
+    asset.updated_at = datetime.utcnow()
+    
+    # Mark issuance as returned (cancelled)
+    issuance.return_date = datetime.utcnow()
+    issuance.notes = f"CANCELLED: {cancel_request.reason}"
+    
+    # Cancel all associated pending documents
+    documents = db.query(AssetDocument).filter(
+        and_(
+            AssetDocument.asset_id == asset.id,
+            AssetDocument.user_id == issuance.user_id,
+            AssetDocument.status == DocumentStatus.PENDING
+        )
+    ).all()
+    
+    for document in documents:
+        document.status = DocumentStatus.CANCELLED
+    
+    # Log the cancellation
+    log_audit_action(
+        db=db,
+        action="cancel_issuance",
+        resource_type="asset",
+        resource_id=str(asset.id),
+        resource_name=f"{asset.brand} {asset.model}",
+        user_id=current_user.id,  # Use actual current user
+        user_name=current_user.full_name,  # Use actual current user name
+        user_role=current_user.role.value,  # Use actual current user role
+        description=f"Issuance for {asset.asset_id} to {user.full_name if user else 'user'} was cancelled",
+        details=f"Reason: {cancel_request.reason}",
+        asset_id=asset.id,
+        asset_identifier=asset.asset_id
+    )
+    
+    db.commit()
+    
+    return {"message": "Issuance cancelled successfully", "asset_id": asset.asset_id}
 
 # Export functionality
 @router.get("/export/csv")
@@ -615,19 +1165,35 @@ def import_servers_csv(
                 if not any(value.strip() for value in row.values() if value):
                     continue
                 
-                # Check for duplicate serial number first
-                serial_number = row.get('Serial Number', '').strip() or None
-                if serial_number:
-                    existing_serial = db.query(Asset).filter(Asset.serial_number == serial_number).first()
-                    if existing_serial:
-                        errors.append(f"Row {row_num}: Serial number '{serial_number}' already exists in database")
+                # Get required fields
+                server_description = row.get('server_description', '').strip()
+                server_name = row.get('server_name', '').strip()
+                model = row.get('model', '').strip()
+                asset_tag = row.get('asset_tag', '').strip() or None
+                location = row.get('location', '').strip()
+                os = row.get('os', '').strip()
+                os_version = row.get('os_version', '').strip()
+                asset_checked = row.get('asset_checked', '').strip().lower() in ['yes', 'y', '1', 'true']
+                remark = row.get('remark', '').strip()
+                
+                # Validate required fields
+                if not server_description:
+                    errors.append(f"Row {row_num}: server_description is required")
+                    skipped_count += 1
+                    continue
+                
+                if not model:
+                    errors.append(f"Row {row_num}: model is required")
+                    skipped_count += 1
+                    continue
+                
+                # Check for duplicate asset tag first (if provided)
+                if asset_tag:
+                    existing_asset_tag = db.query(Asset).filter(Asset.asset_tag == asset_tag).first()
+                    if existing_asset_tag:
+                        errors.append(f"Row {row_num}: Asset tag '{asset_tag}' already exists in database")
                         skipped_count += 1
                         continue
-                
-                # Get base info for duplicate detection
-                brand = row.get('Brand', '').strip()
-                model = row.get('Model', '').strip()
-                server_name = row.get('Server Name', '').strip()
                 
                 # Check for potential duplicate based on server name in notes (more specific)
                 if server_name:
@@ -652,25 +1218,12 @@ def import_servers_csv(
                     next_number += 1
                     asset_id = f"SRV-{next_number:03d}"
                 
-                # Parse purchase date
-                purchase_date_str = row.get('Purchase Date', '2024-01-01').strip()
-                try:
-                    purchase_date = datetime.strptime(purchase_date_str, '%Y-%m-%d')
-                except ValueError:
-                    try:
-                        purchase_date = datetime.strptime(purchase_date_str, '%m/%d/%Y')
-                    except ValueError:
-                        purchase_date = datetime.strptime('2024-01-01', '%Y-%m-%d')
+                # Set default dates
+                purchase_date = datetime.strptime('2024-01-01', '%Y-%m-%d')
+                warranty_expiry = datetime.strptime('2027-01-01', '%Y-%m-%d')
                 
-                # Parse warranty expiry
-                warranty_expiry_str = row.get('Warranty Expiry', '2027-01-01').strip()
-                try:
-                    warranty_expiry = datetime.strptime(warranty_expiry_str, '%Y-%m-%d')
-                except ValueError:
-                    try:
-                        warranty_expiry = datetime.strptime(warranty_expiry_str, '%m/%d/%Y')
-                    except ValueError:
-                        warranty_expiry = datetime.strptime('2027-01-01', '%Y-%m-%d')
+                # Extract brand from model (first word)
+                brand = model.split(' ')[0] if model else 'Generic'
                 
                 # Create server asset
                 server_asset = Asset(
@@ -678,14 +1231,17 @@ def import_servers_csv(
                     type="server",
                     brand=brand,
                     model=model,
-                    serial_number=serial_number,
-                    department=row.get('Department', 'IT').strip(),
-                    location=row.get('Location', '').strip(),
+                    serial_number=server_name or None,  # Use server name as serial for uniqueness
+                    asset_tag=asset_tag,  # Finance department assigned tag
+                    department='IT',
+                    location=location,
                     purchase_date=purchase_date,
                     warranty_expiry=warranty_expiry,
-                    purchase_cost=row.get('Purchase Cost', '').strip() or None,
-                    condition=row.get('Condition', 'Good').strip(),
-                    notes=f"Server: {server_name} | OS: {row.get('OS', '')} {row.get('OS Version', '')} | Description: {row.get('Server Description', '')} | Remark: {row.get('Remark', '')}".strip(),
+                    purchase_cost=None,
+                    condition='Good',
+                    os=os or None,  # Store OS in separate field
+                    os_version=os_version or None,  # Store OS version in separate field
+                    notes=f"Server: {server_name} | Description: {server_description} | Asset Checked: {'Yes' if asset_checked else 'No'} | Remark: {remark}".strip(),
                     status=AssetStatus.AVAILABLE
                 )
                 
@@ -811,6 +1367,22 @@ def delete_all_network_appliances(db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to delete network appliances: {str(e)}")
 
+@router.delete("/delete-all/servers")
+def delete_all_servers(db: Session = Depends(get_db)):
+    """Delete all server assets - FOR TESTING ONLY"""
+    try:
+        # Delete all servers
+        deleted_count = db.query(Asset).filter(Asset.type == "server").delete()
+        db.commit()
+        
+        return {
+            "message": f"Successfully deleted {deleted_count} servers",
+            "deleted_count": deleted_count
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to delete servers: {str(e)}")
+
 @router.get("/import/network-appliances/template")
 def download_network_appliances_template():
     """Download CSV template for network appliances import"""
@@ -824,6 +1396,20 @@ switch,Access layer switch,Netgear,GS724T,NET005GS724T,,Engineering,Office Floor
     # Create response with CSV content
     response = Response(content=template_content, media_type="text/csv")
     response.headers["Content-Disposition"] = "attachment; filename=network_appliances_import_template.csv"
+    return response
+
+@router.get("/import/servers/template")
+def download_servers_template():
+    """Download CSV template for servers import"""
+    template_content = """server_description,server_name,model,asset_tag,location,os,os_version,asset_checked,remark
+File Server(Primary),SIGS0010,Dell PowerEdge R740,FIN-2024-001,Data Center Rack A1,Windows Server 2019 Datacenter,10.0(14393),Yes,Primary file server for company data
+Database Server(Main),SIGS0011,HPE ProLiant DL380,,Server Room B,CentOS 8.5,4.18.0-348,No,MySQL database server - pending asset verification
+Web Server(Production),SIGS0012,Dell PowerEdge R640,FIN-2024-002,Data Center Rack A2,Ubuntu Server 20.04 LTS,5.4.0-74,Yes,Production web server hosting company website
+Development Server(Test),SIGS0013,Supermicro SuperServer,,Development Lab,Windows Server 2022 Standard,10.0(20348),No,Development and testing server environment"""
+    
+    # Create response with CSV content
+    response = Response(content=template_content, media_type="text/csv")
+    response.headers["Content-Disposition"] = "attachment; filename=servers_import_template.csv"
     return response
 
 @router.post("/import/network-appliances")
