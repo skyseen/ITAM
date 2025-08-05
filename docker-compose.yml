@@ -25,6 +25,8 @@ services:
       - "8000:8000"  # Expose FastAPI port
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/itams
+      - SECRET_KEY=your-secret-key-change-in-production
+      - CORS_ORIGINS=["http://localhost:3000", "http://frontend:3000", "http://127.0.0.1:3000"]
     depends_on:
       - postgres  # Wait for database to be ready
     volumes:
