@@ -49,9 +49,13 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Token expired or invalid
-      localStorage.removeItem('access_token');
-      window.location.href = '/login';
+      // Only redirect if this is NOT a login request
+      // Login requests should be handled by the login component
+      if (!error.config?.url?.includes('/auth/login')) {
+        // Token expired or invalid for authenticated requests
+        localStorage.removeItem('access_token');
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }
@@ -96,17 +100,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           localStorage.removeItem('access_token');
           setToken(null);
         }
-      } else {
-        // Temporary: Set a default admin user for testing
-        setUser({
-          id: 1,
-          username: 'admin',
-          email: 'admin@test.com',
-          full_name: 'Test Admin',
-          department: 'IT',
-          role: 'admin',
-          is_active: true,
-        });
       }
       setLoading(false);
     };

@@ -50,15 +50,36 @@ const Login: React.FC = () => {
   
   const { login } = useAuth();
 
+
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation();
+    
     setLoading(true);
     setError('');
 
     try {
       await login({ username, password });
+      // If login succeeds, navigation will happen automatically
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Login failed');
+      // Extract error message from different possible error formats
+      let errorMessage = 'Invalid username or password';
+      
+      if (err.response?.data?.detail) {
+        errorMessage = err.response.data.detail;
+      } else if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err.message) {
+        errorMessage = err.message;
+      } else if (err.response?.status === 401) {
+        errorMessage = 'Invalid username or password';
+      }
+      
+      setError(errorMessage);
+      
+      // Clear password field on error for security
+      setPassword('');
     } finally {
       setLoading(false);
     }
@@ -113,15 +134,17 @@ const Login: React.FC = () => {
                   status="error" 
                   sx={{
                     ...glassEffects.secondary,
-                    border: '1px solid rgba(239, 68, 68, 0.2)',
+                    border: '1px solid rgba(239, 68, 68, 0.4)',
+                    bg: 'rgba(239, 68, 68, 0.1)',
                   }}
+                  borderRadius="md"
                 >
                   <AlertIcon color="red.300" />
-                  <Text color="white">{error}</Text>
+                  <Text color="white" fontWeight="medium">{error}</Text>
                 </Alert>
               )}
 
-              <Box as="form" onSubmit={handleSubmit} w="100%">
+              <Box as="form" onSubmit={handleSubmit} w="100%" noValidate>
                 <VStack spacing={6}>
                   <FormControl isRequired>
                     <FormLabel color="white" fontWeight="medium">
@@ -174,22 +197,24 @@ const Login: React.FC = () => {
                       }}
                     />
                   </FormControl>
+                </VStack>
 
-                  <Button
-                    type="submit"
-                    isLoading={loading}
-                    loadingText="Signing in..."
-                    w="100%"
-                    size="lg"
-                    sx={{
-                      ...componentPresets.navItem,
-                      bg: 'rgba(6, 182, 212, 0.8)',
-                      color: 'white',
-                      fontWeight: 'bold',
-                      fontSize: 'md',
-                      h: 12,
-                      _hover: {
-                        bg: 'rgba(6, 182, 212, 1)',
+                <VStack spacing={6} w="100%" mt={4}>
+                    <Button
+                      type="submit"
+                      isLoading={loading}
+                      loadingText="Signing in..."
+                      w="100%"
+                      size="lg"
+                      sx={{
+                        ...componentPresets.navItem,
+                        bg: 'rgba(6, 182, 212, 0.8)',
+                        color: 'white',
+                        fontWeight: 'bold',
+                        fontSize: 'md',
+                        h: 12,
+                        _hover: {
+                          bg: 'rgba(6, 182, 212, 1)',
                         transform: 'translateY(-2px)',
                         boxShadow: '0 10px 25px rgba(6, 182, 212, 0.3)',
                       },
@@ -200,6 +225,8 @@ const Login: React.FC = () => {
                   >
                     Sign In
                   </Button>
+                  
+
                 </VStack>
               </Box>
             </VStack>
